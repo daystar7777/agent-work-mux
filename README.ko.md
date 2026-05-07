@@ -102,6 +102,8 @@ gitignore된 `.agent-work-mux/runs/`에 두고, orchestrator에는 요약 결과
 ```text
 /awm setup
 /awm agents
+/awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>]
+/awm agent add <alias> <selector-or-description>
 /awm agents test [--all | <agent-selector>] [--smoke]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
@@ -119,6 +121,15 @@ gitignore된 `.agent-work-mux/runs/`에 두고, orchestrator에는 요약 결과
 
 `/awm setup`은 lifecycle 메타데이터, alias, runner pointer를 갱신하지만 그 자체로
 worker를 실행하지 않습니다.
+
+`/awm agents add 오픈코드의 딥시크`처럼 말하면 `AIMemory/AGENTS.md`에
+`opencode-deepseek -> opencode:deepseek:auto` 같은 안전한 프로젝트 alias를
+등록합니다. 등록만 하고 worker 테스트나 실행은 하지 않습니다.
+
+직접 alias를 정하고 싶으면 singular shortcut을 씁니다.
+`/awm agent add 딥시크 오픈코드:딥시크`와
+`/awm agent add 딥시크 오픈코드의 딥시크`는 둘 다
+`딥시크 -> opencode:deepseek:auto`로 등록합니다.
 
 새 goal request는 첫 단어가 예약어가 아니면 따옴표 없이도 사용할 수 있습니다.
 다만 request가 `list`, `history`, `status`, `pause`, `resume`, `stop`,
@@ -200,6 +211,16 @@ codex:gpt-5-codex
 
 `claude-max`, `deepseek-pro-max` 같은 alias는 프로젝트별로
 `AIMemory/AGENTS.md`에 정의합니다.
+
+새 alias는 `/awm agents add <description>`로 등록할 수 있습니다. 예를 들어
+`/awm agents add 오픈코드의 딥시크`는 별도 지정이 없으면
+`opencode-deepseek -> opencode:deepseek:auto`로 정규화합니다. `--as`로 alias를,
+`--selector`로 정확한 selector를 지정할 수 있습니다. 새 alias는
+`/awm agents test <alias> --smoke`가 통과하기 전까지 untested로 봅니다.
+
+alias를 첫 인자로 직접 주는 `/awm agent add <alias> <selector-or-description>`
+형태도 지원합니다. 그래서 `/awm agent add 딥시크 오픈코드:딥시크`와
+`/awm agent add 딥시크 오픈코드의 딥시크`는 같은 결과를 냅니다.
 
 ---
 

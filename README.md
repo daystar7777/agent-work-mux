@@ -177,6 +177,8 @@ message protocol. The primary user-facing workflow is `/awm goal`.
 ```text
 /awm setup
 /awm agents
+/awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>]
+/awm agent add <alias> <selector-or-description>
 /awm agents test [--all | <agent-selector>] [--smoke]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
@@ -204,6 +206,12 @@ Important rules:
 - `/awm goal` defaults to auto-run after parsing/planning.
 - `/awm setup` refreshes lifecycle metadata, aliases, and runner pointers; it
   does not dispatch workers.
+- `/awm agents add 오픈코드의 딥시크` registers a safe project alias such as
+  `opencode-deepseek -> opencode:deepseek:auto` in `AIMemory/AGENTS.md`; it
+  does not test or dispatch the worker.
+- `/awm agent add 딥시크 오픈코드:딥시크` and
+  `/awm agent add 딥시크 오픈코드의 딥시크` register the local-language alias
+  `딥시크 -> opencode:deepseek:auto`.
 - Headless dispatch requires `/awm`; plain natural language is never enough.
 - Goal records store state, compact results, and errors, not full transcripts.
 - `AIMemory/goals/ACTIVE.md` points to the current goal and resume checkpoint.
@@ -298,7 +306,19 @@ Aliases are project-scoped and live in `AIMemory/AGENTS.md`, for example:
 ```text
 claude-max -> claude:opus-4.7:max
 deepseek-pro-max -> deepseek:coder:max
+opencode-deepseek -> opencode:deepseek:auto
+딥시크 -> opencode:deepseek:auto
 ```
+
+Use `/awm agents add <description>` to register a new alias. The command accepts
+natural-language descriptions and common local-language names; for example,
+`/awm agents add 오픈코드의 딥시크` creates `opencode-deepseek` unless you override
+it with `--as` or `--selector`. Use
+`/awm agent add <alias> <selector-or-description>` when you want to choose the
+alias directly; both `/awm agent add 딥시크 오픈코드:딥시크` and
+`/awm agent add 딥시크 오픈코드의 딥시크` register
+`딥시크 -> opencode:deepseek:auto`. New aliases are marked untested until
+`/awm agents test <alias> --smoke` passes.
 
 Keep secrets, credentials, auth tokens, private executable paths, and local
 account names out of `AIMemory/AGENTS.md`. Put private overrides under ignored

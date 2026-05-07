@@ -885,6 +885,8 @@ Supported command contract:
 ```text
 /awm setup
 /awm agents
+/awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>] [--capabilities <tags>]
+/awm agent add <alias> <selector-or-description> [--capabilities <tags>]
 /awm agents test [--all | <agent-selector>] [--smoke]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
@@ -906,6 +908,17 @@ Supported command contract:
 Setup must keep project-safe routing in AIMemory and ask before writing any
 private local override under `.agent-work-mux/`. It does not authorize worker
 dispatch by itself.
+
+`/awm agents add` and singular `/awm agent add` register project-scoped aliases
+in `AIMemory/AGENTS.md`. The plural form may infer the alias from a
+description. The singular form treats the first argument after `add` as the
+alias. For example, `/awm agents add 오픈코드의 딥시크` normalizes to
+`opencode-deepseek -> opencode:deepseek:auto`, while both
+`/awm agent add 딥시크 오픈코드:딥시크` and
+`/awm agent add 딥시크 오픈코드의 딥시크` normalize to
+`딥시크 -> opencode:deepseek:auto`. The command updates routing metadata only;
+it must not claim the worker is callable until
+`/awm agents test <alias> --smoke` passes.
 
 `/awm agents test` lazy-loads `agent-call-probe.md` and verifies configured
 worker invocations before real goal dispatch. It uses tiny smoke prompts,
@@ -1027,6 +1040,23 @@ project-scoped and live in `AIMemory/AGENTS.md`; examples include
 model tiers, capabilities, default policies, and environment variable names.
 It MUST NOT contain secrets, credentials, auth tokens, or private absolute
 machine paths. Machine-private overrides belong under `.agent-work-mux/`.
+
+`/awm agents add <description>` updates the `Project aliases` table in
+`AIMemory/AGENTS.md` without dispatching workers.
+`/awm agent add <alias> <selector-or-description>` is a singular shortcut where
+the first token after `add` is the alias and the remaining text is the selector
+or description.
+Local-language aliases such as `딥시크` are allowed when the user asks for them.
+If `--selector` is provided, validate and use that selector; if `--as` is
+provided, use that alias. Normalize selector-like local-language text before
+validation, so `오픈코드:딥시크` becomes `opencode:deepseek:auto`. Without flags,
+infer known words such as `opencode`, `open code`, or `오픈코드` -> `opencode`,
+and `deepseek` or `딥시크` -> `deepseek`. A description containing both runner
+and model/provider defaults to `<runner>:<model-or-tier>:auto` with alias
+`<runner>-<model-or-tier>`, so `오픈코드의 딥시크` registers
+`opencode-deepseek -> opencode:deepseek:auto`. If inference is ambiguous or
+would overwrite a different selector, ask before changing `AGENTS.md`. Mark new
+aliases as untested and recommend `/awm agents test <alias> --smoke`.
 
 Implementer/verifier separation is optional policy, not a protocol default.
 Users may choose `single_agent`, `implement_then_verify`, or another
@@ -1639,6 +1669,7 @@ by task difficulty and records the choice in the goal record.
 - goal_ledger_file: AIMemory/goals/INDEX.md
 - completion_guard_required: true
 - telemetry_policy: compact_only
+- agent_registration: natural_language_aliases
 
 ## Model and profile policy
 
@@ -1655,6 +1686,20 @@ by task difficulty and records the choice in the goal record.
 | claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Orchestrator chooses model/profile by difficulty. |
 | codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Useful for implementation/review loops. |
 | gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Adjust to actual project setup. |
+
+## Agent registration notes
+
+- `/awm agents add <description>` may append rows to `Project aliases`.
+- Example: `/awm agents add 오픈코드의 딥시크` appends
+  `opencode-deepseek -> opencode:deepseek:auto`.
+- Singular alias form is also supported:
+  `/awm agent add 딥시크 오픈코드:딥시크` and
+  `/awm agent add 딥시크 오픈코드의 딥시크` append
+  `딥시크 -> opencode:deepseek:auto`.
+- New aliases are untested until `/awm agents test <alias> --smoke` updates
+  `Agent call hints`.
+- Keep natural-language source text in Notes when useful. Alias values may be
+  local-language nicknames; `Resolves to` values must stay selector-safe.
 
 ## Private overrides
 

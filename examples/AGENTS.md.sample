@@ -18,6 +18,7 @@ by task difficulty and records the choice in the goal record.
 - completion_guard_required: true
 - telemetry_policy: compact_only
 - agent_call_probe: lazy
+- agent_registration: natural_language_aliases
 
 ## Model and profile policy
 
@@ -34,7 +35,22 @@ by task difficulty and records the choice in the goal record.
 | claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Choose model/profile by task difficulty. |
 | claude-max | claude:opus-4.7:max | filesystem-read, filesystem-write, shell-exec, subagent-spawn | Expensive/high-context profile. |
 | codex | codex:gpt-5-codex:auto | filesystem-read, filesystem-write, shell-exec | Implementation and review. |
+| opencode-deepseek | opencode:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Registered from `/awm agents add 오픈코드의 딥시크`; run `/awm agents test opencode-deepseek --smoke` before dispatch. |
+| 딥시크 | opencode:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Registered from `/awm agent add 딥시크 오픈코드:딥시크` or `/awm agent add 딥시크 오픈코드의 딥시크`; run `/awm agents test 딥시크 --smoke` before dispatch. |
 | gemini-pro | gemini:pro:auto | filesystem-read, web-search, image-input | Use when multimodal or long-context search is needed. |
+
+## Agent registration notes
+
+- `/awm agents add <description>` appends safe project-scoped aliases.
+- Natural-language examples such as `오픈코드의 딥시크` are normalized to ASCII
+  alias/selector rows such as `opencode-deepseek -> opencode:deepseek:auto`.
+- `/awm agent add <alias> <selector-or-description>` uses the first argument as
+  the alias, so both `딥시크 오픈코드:딥시크` and `딥시크 오픈코드의 딥시크`
+  register `딥시크 -> opencode:deepseek:auto`.
+- Use `--as` to choose the alias in plural form and `--selector` to force the
+  exact selector.
+- Registered aliases are untested until `/awm agents test <alias> --smoke`
+  updates `Agent call hints`.
 
 ## Private overrides
 

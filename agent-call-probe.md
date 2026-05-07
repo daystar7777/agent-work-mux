@@ -97,6 +97,7 @@ Use `.agent-work-mux/agents.local.md` for machine-local details:
 
 ## Classification
 
+- `untested` - alias was registered but no smoke probe has run yet.
 - `pass` - command returned expected response in stdout or declared output file.
 - `pass_with_warnings` - expected response returned, but non-fatal warnings
   appeared.

@@ -35,6 +35,8 @@ Can another agent review this?
 ```text
 /awm setup
 /awm agents
+/awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>] [--capabilities <tags>]
+/awm agent add <alias> <selector-or-description> [--capabilities <tags>]
 /awm agents test [--all | <agent-selector>] [--smoke]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
@@ -59,6 +61,20 @@ It may add `AIMemory/RUNNER.md` only as a short project runner pointer.
 Executable paths, account names, tokens, and local commands belong in ignored
 `.agent-work-mux/` overrides or environment variables, and setup must ask
 before writing those local overrides. Setup never dispatches workers.
+
+`/awm agents add` and its singular shortcut `/awm agent add` register
+project-scoped aliases in `AIMemory/AGENTS.md`. The plural form may infer the
+alias from a description. The singular form treats the first argument after
+`add` as the alias. These examples should all resolve to the same selector:
+
+```text
+/awm agents add 오픈코드의 딥시크        -> opencode-deepseek -> opencode:deepseek:auto
+/awm agent add 딥시크 오픈코드:딥시크   -> 딥시크 -> opencode:deepseek:auto
+/awm agent add 딥시크 오픈코드의 딥시크 -> 딥시크 -> opencode:deepseek:auto
+```
+
+The command only updates routing metadata. It must not claim the worker is
+callable until `/awm agents test <alias> --smoke` passes.
 
 `/awm agents test` lazy-loads `agent-call-probe.md` and verifies configured
 worker invocations with tiny smoke prompts. It stores raw logs in ignored
@@ -184,6 +200,44 @@ Resolution order:
 
 Aliases are project-scoped. Local-language nicknames are allowed if they are
 stored in `AIMemory/AGENTS.md` and resolve to a safe selector.
+
+## Agent registration
+
+`/awm agents add <description>` and
+`/awm agent add <alias> <selector-or-description>` update the `Project aliases`
+table in `AIMemory/AGENTS.md`. They never dispatch workers.
+
+Parsing rules:
+
+1. Preserve the user's original command or description in the Notes cell.
+2. `/awm agent add` is a singular shortcut. The first token after `add` is the
+   alias, and the remaining text is the selector or natural-language
+   description. Local-language aliases such as `딥시크` are allowed.
+3. If `--selector` is provided, use it after validating the
+   `<agent>[:<model-or-tier>[:<profile>]]` shape.
+4. If `--as` is provided, use that alias. ASCII slugs are preferred for
+   cross-tool ergonomics, but local-language nicknames are allowed when the user
+   asks for them.
+5. Normalize selector-like text before validation. For example,
+   `오픈코드:딥시크` becomes `opencode:deepseek:auto`.
+6. Without flags, infer a selector from known public words, including:
+   `opencode`, `open code`, `오픈코드` -> `opencode`;
+   `deepseek`, `딥시크` -> `deepseek`;
+   `claude`, `클로드` -> `claude`;
+   `codex`, `코덱스` -> `codex`;
+   `gemini`, `제미나이` -> `gemini`.
+7. When both a runner and a model/provider are inferred, default to
+   `<runner>:<model-or-tier>:auto` and alias `<runner>-<model-or-tier>`.
+8. When only one agent name is inferred, default to `<agent>:auto:auto` and
+   alias `<agent>`.
+9. If the result would overwrite an existing alias with a different selector,
+   ask before replacing it.
+10. If inference is ambiguous, ask for `--as` or `--selector`.
+
+Default capability hints are conservative: `opencode`, `claude`, and `codex`
+get `filesystem-read, filesystem-write, shell-exec`; `gemini` gets
+`filesystem-read, web-search, image-input`; unknown agents get `unknown` until
+tested. Add a note such as `Registered from "/awm agent add 딥시크 오픈코드의 딥시크"; run /awm agents test 딥시크 --smoke before dispatch.`
 
 ## Goal record schema
 
