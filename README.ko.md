@@ -47,9 +47,10 @@ Install daystar7777/agent-work-mux into this project.
 AgentWorkMux는 목표 파일을 만들고, 프로젝트별 alias를 해석하고, 기본적으로
 계획 수립 뒤 auto-run으로 진행합니다.
 
-Headless 실행은 반드시 명시적인 `/awm` 명령이 있을 때만 시작합니다. 그냥
-자연어로 “Claude가 구현하고 Gemini가 테스트해줘”라고 말하는 것만으로는
-headless worker를 실행하지 않습니다.
+새 goal 오케스트레이션은 반드시 `/awm goal` 형식을 사용합니다. 그 외 AWM 명령은
+`/awm ...`로 써도 되고, “AgentWorkMux 다시 setup 해줘”, “agents 목록 보여줘”,
+“오픈코드의 딥시크를 등록해줘”, “모든 agents 테스트해줘”처럼 의도가 분명한
+자연어로도 실행할 수 있습니다.
 
 ---
 
@@ -105,6 +106,7 @@ gitignore된 `.agent-work-mux/runs/`에 두고, orchestrator에는 요약 결과
 ```text
 /awm setup
 /awm agents
+/awm agents list
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>]
 /awm agent add <alias> <selector-or-description>
 /awm agents test [--all | <agent-selector>] [--smoke] [--live]
@@ -125,6 +127,10 @@ gitignore된 `.agent-work-mux/runs/`에 두고, orchestrator에는 요약 결과
 `/awm setup`은 lifecycle 메타데이터, alias, runner pointer를 갱신하지만 그 자체로
 worker를 실행하지 않습니다.
 
+`/awm agents`와 `/awm agents list`는 등록된 alias와 call hint만 보여주며 worker를
+테스트하거나 실행하지 않습니다. “등록된 agents 보여줘” 같은 자연어도 여기에
+매핑합니다.
+
 `/awm agents add 오픈코드의 딥시크`처럼 말하면 `AIMemory/AGENTS.md`에
 `opencode-deepseek -> opencode:deepseek:auto` 같은 안전한 프로젝트 alias를
 등록합니다. 등록만 하고 worker 테스트나 실행은 하지 않습니다.
@@ -133,6 +139,10 @@ worker를 실행하지 않습니다.
 `/awm agent add 딥시크 오픈코드:딥시크`와
 `/awm agent add 딥시크 오픈코드의 딥시크`는 둘 다
 `딥시크 -> opencode:deepseek:auto`로 등록합니다.
+
+자연어는 명확한 non-goal AWM 명령으로 라우팅할 수 있지만, 새 goal 생성은
+자연어만으로 시작하지 않습니다. 목표 단위 오케스트레이션은 `/awm goal ...`을
+사용해야 합니다. Guarded CLI live 실행 규칙도 그대로 적용됩니다.
 
 새 goal request는 첫 단어가 예약어가 아니면 따옴표 없이도 사용할 수 있습니다.
 다만 request가 `list`, `history`, `status`, `pause`, `resume`, `stop`,
@@ -305,5 +315,5 @@ token, credential, 개인 실행 파일 경로를 넣지 마세요. 개인 경�
 ## 한 줄 요약
 
 AgentWorkMux는 여러 AI 코딩 에이전트를 같은 프로젝트 기억에 연결하고,
-명시적인 `/awm goal`로 목표 단위 작업을 라우팅하며, 결과와 오류만 깔끔하게
-남기는 마크다운 우선 프로토콜입니다.
+명시적인 `/awm goal`로 새 목표 단위 작업을 라우팅하며, 그 밖의 AWM 관리 명령은
+자연어로도 받아들이는 마크다운 우선 프로토콜입니다.

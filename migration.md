@@ -112,8 +112,8 @@ Use the current AgentWorkMux reminder text:
 ```text
 This project uses AgentWorkMux. Read AIMemory/INDEX.md,
 AIMemory/PROJECT_OVERVIEW.md, and recent AIMemory/work.log before acting.
-Use /awm goal for explicit goal orchestration. Plain natural language must not
-start headless worker dispatch.
+Use /awm goal for new goal orchestration. Other AWM commands may be invoked
+by clear natural-language requests; follow guarded CLI live-run rules.
 ```
 
 ### 5. Record lifecycle without duplication

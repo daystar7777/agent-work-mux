@@ -1,20 +1,23 @@
 # AgentWorkMux v3 CLI Runner Spec
 
 This file is lazy-loaded. Do not read or copy it into an active agent context
-unless the user invoked an explicit `/awm` command that requires runner
-behavior, such as `/awm goal`, `/awm run`, or `/awm status`.
+unless the user invoked an explicit `/awm` command or made a clear natural
+language AgentWorkMux request that requires runner behavior.
 
 The runner is a local CLI design. MCP is deferred. The protocol remains
 markdown-first; the runner consumes and writes markdown state instead of
 replacing it.
 
-## Non-negotiable trigger rule
+## Natural Language Trigger Rule
 
-Headless execution MUST require an explicit `/awm` command. Plain natural
-language may ask an agent to plan, hand off, or continue manually, but it must
-not dispatch headless workers.
+New goal orchestration is the only AWM command that MUST use the literal
+`/awm goal` form. All other AWM commands may be invoked by clear natural
+language, including setup, uninstall, agent listing, agent registration, agent
+tests, hint lookup, run, and handoff requests. Guarded CLI live-run rules still
+apply: Codex CLI, Claude CLI, and Gemini CLI must not receive live prompts
+unless the user explicitly asks for that execution or uses `--live`.
 
-Examples that may use the runner:
+Examples that may use the runner from explicit command text:
 
 ```text
 /awm goal "Ship the auth hardening slice. Claude implements, Codex reviews."
@@ -22,7 +25,18 @@ Examples that may use the runner:
 /awm goal status auth-hardening-20260507
 ```
 
-Examples that must not start headless dispatch:
+Examples that may use the runner from natural language:
+
+```text
+AgentWorkMux setup 다시 해줘.
+등록된 agents 목록 보여줘.
+오픈코드의 딥시크를 agent로 등록해줘.
+모든 agents를 smoke test 해줘.
+기존 agent hints만 보여줘.
+opencode로 테스트 실행하고 요약해줘.
+```
+
+Examples that must not create a new goal:
 
 ```text
 Ship the auth hardening slice.
@@ -30,11 +44,15 @@ Have Claude implement this later.
 Can another agent review this?
 ```
 
+For those broad goal-like requests, ask the user to use `/awm goal ...` if they
+want goal-level orchestration.
+
 ## Command surface
 
 ```text
 /awm setup
 /awm agents
+/awm agents list
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>] [--capabilities <tags>]
 /awm agent add <alias> <selector-or-description> [--capabilities <tags>]
 /awm agents test [--all | <agent-selector>] [--smoke] [--live]
@@ -61,6 +79,10 @@ It may add `AIMemory/RUNNER.md` only as a short project runner pointer.
 Executable paths, account names, tokens, and local commands belong in ignored
 `.agent-work-mux/` overrides or environment variables, and setup must ask
 before writing those local overrides. Setup never dispatches workers.
+
+`/awm agents` and `/awm agents list` read `AIMemory/AGENTS.md` and print the
+registered aliases plus the latest compact call hints. Natural language such
+as "registered agents 보여줘" maps here without testing or dispatching workers.
 
 `/awm agents add` and its singular shortcut `/awm agent add` register
 project-scoped aliases in `AIMemory/AGENTS.md`. The plural form may infer the

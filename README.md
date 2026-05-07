@@ -54,9 +54,10 @@ unless the request starts with a reserved goal subcommand such as `list` or
 auto-run after parsing/planning, and stores compact results/errors under
 `AIMemory/goals/`.
 
-Headless execution requires an explicit `/awm` command. Plain natural language
-can still ask for planning or manual handoff, but it must not start headless
-workers.
+New goal orchestration requires the literal `/awm goal` form. Other AWM
+commands can be invoked with either `/awm ...` or clear natural language, such
+as asking to set up AgentWorkMux, list agents, register a worker, test agents,
+show hints, uninstall, run a named non-goal task, or create a manual handoff.
 
 ### Resume Later
 
@@ -182,6 +183,7 @@ message protocol. The primary user-facing workflow is `/awm goal`.
 ```text
 /awm setup
 /awm agents
+/awm agents list
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>]
 /awm agent add <alias> <selector-or-description>
 /awm agents test [--all | <agent-selector>] [--smoke] [--live]
@@ -211,13 +213,18 @@ Important rules:
 - `/awm goal` defaults to auto-run after parsing/planning.
 - `/awm setup` refreshes lifecycle metadata, aliases, and runner pointers; it
   does not dispatch workers.
-- `/awm agents add 오픈코드의 딥시크` registers a safe project alias such as
+- `/awm agents` and `/awm agents list` show registered aliases and call hints
+  without testing or dispatching workers. Natural language such as "show the
+  registered agents" maps here.
+- `/awm agents add OpenCode DeepSeek` registers a safe project alias such as
   `opencode-deepseek -> opencode:deepseek:auto` in `AIMemory/AGENTS.md`; it
   does not test or dispatch the worker.
-- `/awm agent add 딥시크 오픈코드:딥시크` and
-  `/awm agent add 딥시크 오픈코드의 딥시크` register the local-language alias
-  `딥시크 -> opencode:deepseek:auto`.
-- Headless dispatch requires `/awm`; plain natural language is never enough.
+- `/awm agent add deepseek OpenCode:DeepSeek` and
+  `/awm agent add deepseek OpenCode DeepSeek` register the explicit alias
+  `deepseek -> opencode:deepseek:auto`.
+- Natural language can trigger non-goal AWM commands when the intent is clear,
+  but it must not create a new goal. Ask the user to use `/awm goal ...` for
+  goal-level orchestration.
 - Goal records store state, compact results, and errors, not full transcripts.
 - `AIMemory/goals/ACTIVE.md` points to the current goal and resume checkpoint.
 - `AIMemory/goals/INDEX.md` lists current and previous goals, status, dates,
@@ -312,17 +319,17 @@ Aliases are project-scoped and live in `AIMemory/AGENTS.md`, for example:
 claude-max -> claude:opus-4.7:max
 deepseek-pro-max -> deepseek:coder:max
 opencode-deepseek -> opencode:deepseek:auto
-딥시크 -> opencode:deepseek:auto
+deepseek-local -> opencode:deepseek:auto
 ```
 
 Use `/awm agents add <description>` to register a new alias. The command accepts
 natural-language descriptions and common local-language names; for example,
-`/awm agents add 오픈코드의 딥시크` creates `opencode-deepseek` unless you override
+`/awm agents add OpenCode DeepSeek` creates `opencode-deepseek` unless you override
 it with `--as` or `--selector`. Use
 `/awm agent add <alias> <selector-or-description>` when you want to choose the
-alias directly; both `/awm agent add 딥시크 오픈코드:딥시크` and
-`/awm agent add 딥시크 오픈코드의 딥시크` register
-`딥시크 -> opencode:deepseek:auto`. New aliases are marked untested until
+alias directly; both `/awm agent add deepseek OpenCode:DeepSeek` and
+`/awm agent add deepseek OpenCode DeepSeek` register
+`deepseek -> opencode:deepseek:auto`. New aliases are marked untested until
 `/awm agents test <alias> --smoke` passes.
 
 Keep secrets, credentials, auth tokens, private executable paths, and local
@@ -469,7 +476,8 @@ goal-level orchestration and worker routing.
 - Do not put secrets in `INSTALLATION.md`, `AGENTS.md`, `work.log`, goals, or
   handoffs.
 - Use environment variables or ignored local overrides for private runner data.
-- Plain natural language must not start headless worker dispatch.
+- Natural language may route clear non-goal AWM intents. New goal creation
+  still requires `/awm goal ...`, and guarded CLI live-run rules still apply.
 - If an agent is unsure, it appends a `NOTE` instead of guessing silently.
 
 ---

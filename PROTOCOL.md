@@ -668,14 +668,18 @@ the user explicitly opts into removing local legacy state.
 
 ## `/awm` command namespace
 
-`/awm` is the canonical command namespace. Headless execution MUST NOT start
-from plain natural language; it requires an explicit `/awm` command.
+`/awm` is the canonical command namespace. New goal orchestration MUST use the
+literal `/awm goal` form. Every other AWM command may also be invoked through a
+clear natural-language request, for example asking to set up AgentWorkMux, list
+agents, register a worker, test agents, show hints, uninstall, run a named
+non-goal task, or create a manual handoff.
 
 Supported command contract:
 
 ```text
 /awm setup
 /awm agents
+/awm agents list
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>] [--capabilities <tags>]
 /awm agent add <alias> <selector-or-description> [--capabilities <tags>]
 /awm agents test [--all | <agent-selector>] [--smoke] [--live]
@@ -699,6 +703,10 @@ Supported command contract:
 Setup must keep project-safe routing in AIMemory and ask before writing any
 private local override under `.agent-work-mux/`. It does not authorize worker
 dispatch by itself.
+
+`/awm agents` and `/awm agents list` read `AIMemory/AGENTS.md` and print the
+registered aliases plus the latest compact call hints. Natural language such
+as "registered agents 보여줘" maps here without testing or dispatching workers.
 
 `/awm agents add` and singular `/awm agent add` register project-scoped aliases
 in `AIMemory/AGENTS.md`. The plural form may infer the alias from a
@@ -738,9 +746,12 @@ working Continue secret setup is acceptable; if local env fallback returns a
 DeepSeek 401, use an explicit local config secret reference such as
 `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`.
 
-Plain natural language remains valid for normal collaboration, planning, and
-manual handoffs. It does not authorize headless dispatch. If intent is
-ambiguous, ask a short confirmation or provide a dry-run plan.
+Natural language command routing MUST NOT turn a broad project objective into
+a new goal. If the user asks for goal-level orchestration without `/awm goal`,
+ask them to use `/awm goal ...`. Natural language can still route safe
+management commands and explicit non-goal worker requests, while guarded CLI
+live-run rules remain in force. If intent is ambiguous, ask a short
+confirmation or provide a dry-run plan.
 
 New goal creation accepts either a quoted request or an unquoted shorthand.
 Parse `/awm goal` by checking the first token after `goal`:
@@ -1029,9 +1040,10 @@ Before responding to a user prompt:
 - [ ] If proceeding, append PROMPT entry
 - [ ] At session start, also append RE_ENGAGED with capabilities
 - [ ] If the prompt starts with `/awm`, parse the command and update/create
-      the matching goal or lifecycle record
-- [ ] If the prompt is plain natural language, do not start headless runner
-      dispatch
+      the matching goal, alias, or lifecycle record
+- [ ] If the prompt is plain natural language, route clear non-goal AWM
+      intents to the matching command; require literal `/awm goal` for new
+      goal orchestration
 - [ ] Before finishing, append WORK_END
 
 Before creating a new markdown file:
