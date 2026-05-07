@@ -131,14 +131,35 @@ start headless worker dispatch.
 <!-- agent-work-mux:end -->
 ```
 
+Hash only the managed reminder text, excluding the sentinel lines. On Windows,
+prefer the compatibility form below because Windows PowerShell 5.1 does not
+provide `[System.Security.Cryptography.SHA256]::HashData`:
+
+```powershell
+$reminderText = @(
+  'This project uses AgentWorkMux. Read AIMemory/INDEX.md,'
+  'AIMemory/PROJECT_OVERVIEW.md, and recent AIMemory/work.log before acting.'
+  'Use /awm goal for explicit goal orchestration. Plain natural language must not'
+  'start headless worker dispatch.'
+) -join "`r`n"
+$sha256 = [System.Security.Cryptography.SHA256]::Create()
+try {
+  $hashBytes = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($reminderText))
+} finally {
+  $sha256.Dispose()
+}
+$hash = [System.BitConverter]::ToString($hashBytes).Replace('-', '').ToLowerInvariant()
+```
+
 For non-markdown formats, use the file's native comment delimiter while keeping
 the `agent-work-mux:start` and `agent-work-mux:end` tokens. Record the path,
 format, sentinel hash, line range, and purpose in
 `AIMemory/INSTALLATION.md` `Harness files modified`.
 
 If the harness file is absent or you are not confident about its format, do not
-guess. Leave `Harness files modified` as `(none yet)` and tell the user how to
-add the reminder manually.
+guess. Leave `Harness files modified` as
+`(none - no harness reminder installed)` and tell the user how to add the
+reminder manually.
 
 ### Task 7 - Append the first event
 
@@ -245,6 +266,12 @@ For non-markdown files, use the native comment delimiter for that file format
 but keep the same `agent-work-mux:start` and `agent-work-mux:end` tokens.
 Uninstall may also recognize legacy `agent-work-mem:*` sentinel tokens from
 pre-rename installations.
+
+The `sha256` value is the SHA-256 hash of the managed reminder text only,
+excluding the sentinel lines. Automated installers MUST update
+`INSTALLATION.md` by explicit field or table section, not by broad global
+replacement; the `Harness files modified` and `Reinstall history` tables have
+different meanings.
 
 Do not put secrets, credentials, auth tokens, or private machine paths in
 `INSTALLATION.md`. If a runner or harness needs private paths, put them in
@@ -1562,7 +1589,7 @@ machine paths.
 ## Harness files modified
 | Path | Format | Sentinel hash | Line range | Purpose |
 |------|--------|---------------|------------|---------|
-| (none yet) | | | | |
+| (none - no harness reminder installed) | | | | |
 
 ## Lifecycle history
 | Timestamp | Event | Model | Summary |
@@ -1572,7 +1599,7 @@ machine paths.
 ## Reinstall history
 | Timestamp | Previous installer | New installer | Model | AIMemory state |
 |-----------|--------------------|---------------|-------|----------------|
-| (none yet) | | | | |
+| (none - first install) | | | | |
 
 ## Private data policy
 
@@ -1581,7 +1608,9 @@ this file. Put private runner or harness overrides under ignored
 `.agent-work-mux/` files or environment variables.
 ```
 
-Replace placeholders with real values.
+Replace placeholders with real values. Automated installers MUST scope
+replacement to the matching field or table; do not globally replace default
+table rows across this file.
 
 ---
 
