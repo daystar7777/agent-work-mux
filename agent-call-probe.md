@@ -16,6 +16,14 @@ repeat avoidable first-call failures.
 
 - Run only after an explicit `/awm` command or direct user request.
 - Tell the user that smoke calls may consume tokens or credits.
+- Do not run live completions for guarded CLIs during default probes. Codex
+  CLI, Claude CLI, and Gemini CLI default to version/auth checks only; run
+  their live prompts only when the user explicitly asks for actual execution,
+  for example `/awm agents test codex --smoke --live`.
+- Treat same-family worker CLIs as guarded by default: Codex should not
+  recursively call Codex CLI, Claude should not call Claude CLI, and
+  Antigravity/Gemini contexts should not call Gemini CLI unless explicitly
+  requested.
 - Use tiny prompts such as `Reply with exactly: <AGENT>_OK`.
 - Store raw stdout/stderr/JSON under ignored `.agent-work-mux/probes/`.
 - Store only compact, non-secret hints in `AIMemory/AGENTS.md`.
@@ -28,11 +36,15 @@ repeat avoidable first-call failures.
 ## Commands
 
 ```text
-/awm agents test [--all | <agent-selector>] [--smoke]
+/awm agents test [--all | <agent-selector>] [--smoke] [--live]
 /awm agents hints [agent-selector]
 ```
 
 `/awm agents test` runs the probe and updates the call hints.
+For guarded CLIs, the default probe checks the CLI and non-prompt auth state
+where available but does not send a prompt. Treat `--live`, or a direct request
+such as "actually run Claude/Codex/Gemini", as authorization to perform the
+live call.
 `/awm agents hints` reads existing hints without running agents.
 
 ## Probe record
@@ -65,12 +77,12 @@ Append or refresh an `Agent call hints` section in `AIMemory/AGENTS.md`:
 |-------|-------------|-------------|-----------------|-----------------|-----------|--------------|
 | opencode | <date> | opencode 1.14.33 | pass | opencode run --model <provider/model> --format json "<prompt>" | JSON events include step_finish tokens/cost | Put message before repeated --file args. |
 | continue | <date> | Continue CLI 1.5.45 | pass | cn [--config <config-if-needed>] --readonly -p "<prompt>" --format json | JSON output in headless mode; `cn serve --port <port>` exposes HTTP `/state` and `/message` | Any working Continue secret setup is valid; if local env fallback returns DeepSeek 401, add `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`. |
-| codex | <date> | codex-cli 0.128.0 | pass_with_warnings | codex exec --ephemeral --json --output-last-message <file> --cd <project> "<prompt>" | JSONL turn.completed usage reports tokens | Plugin sync 403, PowerShell shell snapshot, and plugin manifest warnings can be non-fatal if the final message exists. |
-| gemini | <date> | gemini-cli 0.41.2 | pass | gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust | JSON stats include model, token, tool, and file counters | Use `approval-mode plan` for read-only smoke probes. |
+| codex | <date> | codex-cli 0.128.0 | guarded_check_only | default: codex --version; live on request: codex exec --ephemeral --json --output-last-message <file> --cd <project> "<prompt>" | Default probe collects no token telemetry; live runs emit JSONL turn.completed usage. | Guarded CLI: do not run live prompts during default `--all`; require explicit user request or `--live`. |
+| gemini | <date> | gemini-cli 0.41.2 | guarded_check_only | default: gemini --version; live on request: gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust | Default probe collects no token telemetry; live runs emit JSON stats. | Guarded CLI, especially from Antigravity/Gemini contexts: require explicit user request or `--live`. |
 | aider | <date> | aider 0.86.2 | pass | aider --model <provider/model> --message "<prompt>" --no-git --no-auto-commits --no-stream --no-pretty --yes-always --no-analytics --input-history-file .agent-work-mux/tmp/aider/input.history --chat-history-file .agent-work-mux/tmp/aider/chat.history.md --llm-history-file .agent-work-mux/tmp/aider/llm.history | stdout includes tokens/cost | Include "Do not edit files" in smoke prompts; redirect history files to ignored local state. |
 | antigravity | <date> | Antigravity 1.107.0 | gui_only | antigravity chat --mode ask "<prompt>" | none | Command opens/targets the GUI chat and returned no stdout/stderr result. |
 | cursor | <date> | Cursor 3.3.22 | gui_only | <Cursor install>/resources/app/bin/cursor.cmd --chat | none | CLI is an editor/chat launcher and may not be on PATH. |
-| claude | <date> | Claude Code 2.1.132 | billing_blocked | claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence | JSON result with usage/error metadata | CLI and auth can be valid while billing, quota, or probe budget blocks live completion. |
+| claude | <date> | Claude Code 2.1.132 | guarded_check_only | default: claude --version and claude auth status; live on request: claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence | Default probe collects auth/version only; live runs can emit JSON usage/error metadata. | Guarded CLI: do not run live prompts during default `--all`; require explicit user request or `--live`. |
 ```
 
 Do not copy local absolute paths into `AIMemory/AGENTS.md`.
@@ -95,11 +107,16 @@ Use `.agent-work-mux/agents.local.md` for machine-local details:
 - auth: after setting a User-scope variable on Windows, open a fresh shell or inject `[Environment]::GetEnvironmentVariable("DEEPSEEK_API_KEY", "User")` into the probe process.
 
 ## codex
-- command: codex exec --ephemeral --json --output-last-message <last-message-file> --cd <project> "<prompt>"
+- default_check: codex --version
+- live_command: codex exec --ephemeral --json --output-last-message <last-message-file> --cd <project> "<prompt>"
+- headless_status: guarded_check_only
+- guarded_policy: live prompt execution requires an explicit user request or `--live`.
 
 ## gemini
-- command: gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust
-- headless_status: pass
+- default_check: gemini --version
+- live_command: gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust
+- headless_status: guarded_check_only
+- guarded_policy: live prompt execution requires an explicit user request or `--live`, especially from Antigravity/Gemini contexts.
 
 ## aider
 - command: aider --model deepseek/deepseek-chat --message "<prompt>" --no-git --no-auto-commits --no-stream --no-pretty --yes-always --no-analytics --input-history-file .agent-work-mux/tmp/aider/input.history --chat-history-file .agent-work-mux/tmp/aider/chat.history.md --llm-history-file .agent-work-mux/tmp/aider/llm.history
@@ -116,10 +133,11 @@ Use `.agent-work-mux/agents.local.md` for machine-local details:
 - correction_needed: exclude from worker dispatch unless a future version returns machine-readable stdout or a result file.
 
 ## claude
-- command: claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence
+- default_check: claude --version; claude auth status
+- live_command: claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence
 - version: Claude Code 2.1.132
-- headless_status: billing_blocked
-- correction_needed: confirm account billing/quota or raise the probe budget cap, then re-run `/awm agents test claude --smoke`.
+- headless_status: guarded_check_only
+- guarded_policy: live prompt execution requires an explicit user request or `--live`.
 ```
 
 ## Classification
@@ -128,6 +146,10 @@ Use `.agent-work-mux/agents.local.md` for machine-local details:
 - `pass` - command returned expected response in stdout or declared output file.
 - `pass_with_warnings` - expected response returned, but non-fatal warnings
   appeared.
+- `guarded_check_only` - guarded CLI is installed and optionally authenticated,
+  but the default probe intentionally did not send a live prompt. This covers
+  billing-metered and same-family recursive worker CLIs. Run live only after
+  explicit user approval.
 - `gui_only` - command opens or targets an interactive GUI/chat and provides no
   machine-readable result.
 - `retest_required` - CLI is present but service/headless behavior is currently

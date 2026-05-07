@@ -881,7 +881,7 @@ Supported command contract:
 /awm agents
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>] [--capabilities <tags>]
 /awm agent add <alias> <selector-or-description> [--capabilities <tags>]
-/awm agents test [--all | <agent-selector>] [--smoke]
+/awm agents test [--all | <agent-selector>] [--smoke] [--live]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
 /awm goal list [--state <state>] [--limit <n>]
@@ -915,21 +915,28 @@ it must not claim the worker is callable until
 `/awm agents test <alias> --smoke` passes.
 
 `/awm agents test` lazy-loads `agent-call-probe.md` and verifies configured
-worker invocations before real goal dispatch. It uses tiny smoke prompts,
-stores raw probe logs in ignored `.agent-work-mux/probes/`, writes compact
-non-secret call hints to `AIMemory/AGENTS.md`, and writes local/private command
-details to `.agent-work-mux/agents.local.md`. Re-run the probe when an agent CLI
-version changes. `/awm agents hints` reads existing hints without calling
-agents.
+worker invocations before real goal dispatch. It stores raw probe logs in
+ignored `.agent-work-mux/probes/`, writes compact non-secret call hints to
+`AIMemory/AGENTS.md`, and writes local/private command details to
+`.agent-work-mux/agents.local.md`. Guarded CLIs such as Codex CLI, Claude CLI,
+and Gemini CLI are check-only by default: verify version and non-prompt auth
+state where available, but do not send live prompts unless the user explicitly
+asks for actual execution or uses `--live`. This avoids recursive same-family
+calls such as Codex invoking Codex CLI, Claude invoking Claude CLI, or
+Antigravity/Gemini invoking Gemini CLI by default. Re-run the probe when an
+agent CLI version changes. `/awm agents hints` reads existing hints without
+calling agents.
 
-Known headless worker surfaces include Codex `codex exec --json`, OpenCode
-`opencode run --format json`, Gemini CLI `gemini --prompt ... --approval-mode
-plan --output-format json`, Continue CLI `cn --readonly -p ... --format json`
-and `cn serve --port <port>`, Aider `aider --message ...`, and Claude Code
-`claude -p ... --output-format json` when installed. Prefer safe planning or
-read-only modes when a tool provides them. Classify editor launchers such as
-Antigravity `chat` and Cursor `--chat` as `gui_only` unless they return a
-machine-readable stdout stream or result file. For Continue with DeepSeek, any
+Known default smoke surfaces include OpenCode `opencode run --format json`,
+Continue CLI `cn --readonly -p ... --format json` and `cn serve --port <port>`,
+and Aider `aider --message ...`. Guarded live surfaces include Codex `codex
+exec --json`, Claude Code `claude -p ... --output-format json`, and Gemini CLI
+`gemini --prompt ... --approval-mode plan --output-format json`; keep them at
+`guarded_check_only` unless the user explicitly requests a live run. Prefer
+safe planning or read-only modes when a tool provides them. Classify editor
+launchers such as Antigravity `chat` and Cursor `--chat` as `gui_only` unless
+they return a machine-readable stdout stream or result file. For Continue with
+DeepSeek, any
 working Continue secret setup is acceptable; if local env fallback returns a
 DeepSeek 401, use an explicit local config secret reference such as
 `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`.
@@ -1690,12 +1697,12 @@ by task difficulty and records the choice in the goal record.
 ## Project aliases
 | Alias | Resolves to | Capabilities | Notes |
 |-------|-------------|--------------|-------|
-| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Orchestrator chooses model/profile by difficulty. |
-| codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Useful for implementation/review loops. |
+| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Guarded CLI: live dispatch requires an explicit user request. |
+| codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Guarded CLI: live dispatch requires an explicit user request. |
 | opencode | opencode:auto:auto | filesystem-read, filesystem-write, shell-exec | Use `/awm agents test opencode --smoke` before dispatch. |
 | continue | continue:auto:auto | filesystem-read, filesystem-write, shell-exec | Continue CLI `cn` supports headless JSON and `--readonly`. |
 | aider | aider:auto:auto | filesystem-read, filesystem-write, shell-exec | Use `--message` for headless smoke probes. |
-| gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Adjust to actual project setup. |
+| gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Guarded CLI from Antigravity/Gemini contexts; live dispatch requires an explicit user request. |
 
 ## Agent registration notes
 

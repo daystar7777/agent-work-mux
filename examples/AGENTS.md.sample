@@ -32,9 +32,9 @@ by task difficulty and records the choice in the goal record.
 ## Project aliases
 | Alias | Resolves to | Capabilities | Notes |
 |-------|-------------|--------------|-------|
-| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Choose model/profile by task difficulty. |
+| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Guarded CLI: live dispatch requires an explicit user request. |
 | claude-max | claude:opus-4.7:max | filesystem-read, filesystem-write, shell-exec, subagent-spawn | Expensive/high-context profile. |
-| codex | codex:gpt-5-codex:auto | filesystem-read, filesystem-write, shell-exec | Implementation and review. |
+| codex | codex:gpt-5-codex:auto | filesystem-read, filesystem-write, shell-exec | Guarded CLI: live dispatch requires an explicit user request. |
 | opencode | opencode:auto:auto | filesystem-read, filesystem-write, shell-exec | Run `/awm agents test opencode --smoke` before dispatch. |
 | opencode-deepseek | opencode:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Registered from `/awm agents add 오픈코드의 딥시크`; run `/awm agents test opencode-deepseek --smoke` before dispatch. |
 | 딥시크 | opencode:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Registered from `/awm agent add 딥시크 오픈코드:딥시크` or `/awm agent add 딥시크 오픈코드의 딥시크`; run `/awm agents test 딥시크 --smoke` before dispatch. |
@@ -66,9 +66,9 @@ Do not add them here.
 |-------|-------------|-------------|-----------------|-----------------|-----------|--------------|
 | opencode | 2026-05-08 | opencode 1.14.33 | pass | `opencode run --model deepseek/deepseek-v4-flash --format json "<prompt>"` | JSON events include `step_finish` tokens/cost | Put message before repeated `--file` args. |
 | continue | 2026-05-08 | Continue CLI 1.5.45 | pass | `cn [--config <config-if-needed>] --readonly -p "<prompt>" --format json` | JSON output in headless mode; `cn serve --port <port>` `/state` passed | Any working Continue secret setup is valid; local env fallback needed explicit `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` on this probe. |
-| codex | 2026-05-08 | codex-cli 0.128.0 | pass_with_warnings | `codex exec --ephemeral --json --output-last-message <file> --cd <project> "<prompt>"` | JSONL `turn.completed` usage reports tokens | Plugin sync 403, shell snapshot, and manifest/skill loader warnings can be non-fatal if the final message exists. |
-| gemini | 2026-05-08 | gemini-cli 0.41.2 | pass | `gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust` | JSON stats include token/tool/file counters | Use plan mode for read-only smoke probes. |
+| codex | 2026-05-08 | codex-cli 0.128.0 | guarded_check_only | default: `codex --version`; live on request: `codex exec --ephemeral --json --output-last-message <file> --cd <project> "<prompt>"` | Default probe collects no token telemetry; live runs emit JSONL `turn.completed` usage. | Guarded CLI: require explicit user request or `--live`. |
+| gemini | 2026-05-08 | gemini-cli 0.41.2 | guarded_check_only | default: `gemini --version`; live on request: `gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust` | Default probe collects no token telemetry; live runs emit JSON stats. | Guarded CLI, especially from Antigravity/Gemini contexts: require explicit user request or `--live`. |
 | aider | 2026-05-08 | aider 0.86.2 | pass | `aider --model deepseek/deepseek-chat --message "<prompt>" --no-git --no-auto-commits --no-stream --no-pretty --yes-always --no-analytics --input-history-file .agent-work-mux/tmp/aider/input.history --chat-history-file .agent-work-mux/tmp/aider/chat.history.md --llm-history-file .agent-work-mux/tmp/aider/llm.history` | stdout includes tokens/cost | Include "Do not edit files" in smoke prompts; redirect history files to ignored local state. |
 | antigravity | 2026-05-08 | Antigravity 1.107.0 | gui_only | `antigravity chat --mode ask "<prompt>"` | none | Opens/targets GUI chat and returned no machine-readable result. |
 | cursor | 2026-05-08 | Cursor 3.3.22 | gui_only | `<Cursor install>/resources/app/bin/cursor.cmd --chat` | none | Editor/chat launcher only; may not be on PATH. |
-| claude | 2026-05-08 | Claude Code 2.1.132 | billing_blocked | `claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence` | JSON result with usage/error metadata | CLI and auth are present; live completion was blocked by billing/quota or probe budget. |
+| claude | 2026-05-08 | Claude Code 2.1.132 | guarded_check_only | default: `claude --version` and auth status; live on request: `claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence` | Default probe collects auth/version only; live runs can emit JSON usage/error metadata. | Guarded CLI: require explicit user request or `--live`. |

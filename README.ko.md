@@ -107,7 +107,7 @@ gitignore된 `.agent-work-mux/runs/`에 두고, orchestrator에는 요약 결과
 /awm agents
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>]
 /awm agent add <alias> <selector-or-description>
-/awm agents test [--all | <agent-selector>] [--smoke]
+/awm agents test [--all | <agent-selector>] [--smoke] [--live]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
 /awm goal list [--state <state>] [--limit <n>]
@@ -155,19 +155,23 @@ worker를 실행하지 않습니다.
 /awm agents test --all --smoke
 ```
 
-이 명령은 `agent-call-probe.md`를 lazy-load하고, 각 worker agent에 아주 짧은
-프롬프트를 보내 호출 가능 여부를 확인합니다. raw log는 ignored
-`.agent-work-mux/probes/`에 두고, 재사용 가능한 요약 힌트만 `AIMemory/AGENTS.md`에
-남깁니다.
+이 명령은 `agent-call-probe.md`를 lazy-load하고 각 worker agent를 probe합니다.
+raw log는 ignored `.agent-work-mux/probes/`에 두고, 재사용 가능한 요약 힌트만
+`AIMemory/AGENTS.md`에 남깁니다. Guarded CLI인 Codex CLI, Claude CLI,
+Gemini CLI는 기본적으로 check-only입니다. 버전과, 가능한 경우 프롬프트를 보내지
+않는 auth 상태만 확인하고, 사용자가 실제 실행을 명시하거나 `--live`를 붙였을 때만
+프롬프트를 보냅니다. 이렇게 해서 Codex가 Codex CLI를, Claude가 Claude CLI를,
+Antigravity/Gemini가 Gemini CLI를 기본값으로 재귀 호출하지 않게 합니다.
 
 에이전트 버전이 바뀌면 probe를 다시 돌려서 invocation hint와 알려진 오류/교정법을
 갱신합니다. `/awm agents hints`는 agent를 호출하지 않고 기존 힌트만 읽습니다.
 
-현재 검증된 worker smoke 형태는 `opencode run --format json`, `codex exec
---json`, `gemini --prompt ... --approval-mode plan --output-format json`,
-`aider --message ... --no-git --no-auto-commits`에 history 파일을
-`.agent-work-mux/tmp/` 아래로 돌리는 형태, Continue의 `cn --readonly -p ...
---format json`입니다.
+현재 기본 worker smoke 형태는 `opencode run --format json`, `aider --message
+... --no-git --no-auto-commits`에 history 파일을 `.agent-work-mux/tmp/` 아래로
+돌리는 형태, Continue의 `cn --readonly -p ... --format json`입니다. Guarded live
+형태인 `codex exec --json`, `gemini --prompt ... --approval-mode plan
+--output-format json`, `claude -p ... --output-format json`은 사용자가 명시적으로
+요청하거나 `--live`를 붙였을 때만 실행합니다.
 
 Continue는 IDE 전용이 아니라 `cn` CLI로도 지원합니다. `cn -p "<prompt>"`는
 headless 1샷 호출이고, `--format json`은 machine-readable 출력을 제공합니다.
@@ -179,10 +183,10 @@ local env fallback에서 `Bearer sk-` 문구가 들어간 DeepSeek 401이 나면
 config에는 `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` 같은 명시적 secret
 reference를 추가합니다.
 
-Claude Code는 `claude -p "<prompt>" --output-format json --permission-mode
-plan`으로 headless probe를 실행합니다. CLI와 로그인은 확인됐지만 계정 결제,
-quota, 또는 probe budget cap 때문에 live completion이 막히면 `missing_path`가
-아니라 `billing_blocked`로 분류합니다.
+Claude Code는 명시적 live probe에서 `claude -p "<prompt>" --output-format json
+--permission-mode plan`을 씁니다. 기본값은 `claude --version`과 auth 상태 확인만
+합니다. 사용자가 승인한 live 실행이 계정 결제, quota, 또는 probe budget cap 때문에
+막히면 `missing_path`가 아니라 `billing_blocked`로 분류합니다.
 
 ---
 

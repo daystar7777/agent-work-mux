@@ -184,7 +184,7 @@ message protocol. The primary user-facing workflow is `/awm goal`.
 /awm agents
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>]
 /awm agent add <alias> <selector-or-description>
-/awm agents test [--all | <agent-selector>] [--smoke]
+/awm agents test [--all | <agent-selector>] [--smoke] [--live]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
 /awm goal list [--state <state>] [--limit <n>]
@@ -339,20 +339,26 @@ After installation, run a small probe before relying on headless workers:
 /awm agents test --all --smoke
 ```
 
-This lazy-loads `agent-call-probe.md`, calls each configured worker with a tiny
-prompt, records raw logs under ignored `.agent-work-mux/probes/`, and writes
-compact hints to `AIMemory/AGENTS.md`.
+This lazy-loads `agent-call-probe.md`, probes each configured worker, records
+raw logs under ignored `.agent-work-mux/probes/`, and writes compact hints to
+`AIMemory/AGENTS.md`. Guarded CLIs are check-only by default: Codex CLI,
+Claude CLI, and Gemini CLI verify version and non-prompt auth state where
+available without sending a live prompt unless the user explicitly requests
+actual execution or passes `--live`. This prevents recursive same-family calls
+such as Codex invoking Codex CLI, Claude invoking Claude CLI, or
+Antigravity/Gemini invoking Gemini CLI by default.
 
 Hints capture the working invocation, CLI version, headless status, telemetry
 shape, known warnings, and corrected commands after failures. Re-run the probe
 when an agent version changes. Use `/awm agents hints` to read the current
 hints without calling any agent.
 
-Current verified worker smoke shapes include `opencode run --format json`,
-`codex exec --json`, `gemini --prompt ... --approval-mode plan --output-format
-json`, `aider --message ... --no-git --no-auto-commits` with history files
-redirected under `.agent-work-mux/tmp/`, and Continue's `cn --readonly -p ...
---format json`.
+Current default worker smoke shapes include `opencode run --format json`,
+`aider --message ... --no-git --no-auto-commits` with history files redirected
+under `.agent-work-mux/tmp/`, and Continue's `cn --readonly -p ... --format
+json`. Guarded live shapes include `codex exec --json`, `gemini --prompt ...
+--approval-mode plan --output-format json`, and `claude -p ... --output-format
+json`; use them only after an explicit user request or `--live`.
 
 Continue is supported through its `cn` CLI, not just the IDE. `cn -p "<prompt>"`
 runs a headless one-shot, `--format json` provides machine-readable output, and
@@ -365,9 +371,10 @@ the model `apiKey`. If local env fallback produces a DeepSeek 401 with
 `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` in that local config.
 
 Claude Code uses `claude -p "<prompt>" --output-format json --permission-mode
-plan` for headless probes. If the CLI and login are present but account
-billing, quota, or a probe budget cap prevents a live completion, classify the
-result as `billing_blocked`, not `missing_path`.
+plan` for explicit live headless probes. By default, only check `claude
+--version` and auth state. If a user-approved live run is blocked by account
+billing, quota, or a probe budget cap, classify the result as `billing_blocked`,
+not `missing_path`.
 
 ---
 

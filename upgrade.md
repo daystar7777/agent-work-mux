@@ -265,9 +265,9 @@ by task difficulty and records the choice in the goal record.
 ## Project aliases
 | Alias | Resolves to | Capabilities | Notes |
 |-------|-------------|--------------|-------|
-| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Orchestrator chooses model/profile by difficulty. |
-| codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Useful for implementation/review loops. |
-| gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Adjust to actual project setup. |
+| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Guarded CLI: live dispatch requires an explicit user request. |
+| codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Guarded CLI: live dispatch requires an explicit user request. |
+| gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Guarded CLI from Antigravity/Gemini contexts; live dispatch requires an explicit user request. |
 
 ## Private overrides
 
