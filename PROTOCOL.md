@@ -17,9 +17,8 @@ unless the user explicitly asks for a separate human-facing translation.
 Every markdown file you author lives under `AIMemory/`.
 
 Exceptions - files that specific harnesses load from fixed paths
-(e.g. Claude Code reads `CLAUDE.md` from project root; Cursor reads
-`.cursorrules`). If your harness has such a file, it stays where the
-harness expects it.
+(e.g. Claude Code reads `CLAUDE.md` from project root). If your harness has
+such a file, it stays where the harness expects it.
 
 Everything else - notes, plans, reviews, scratch, design docs, analyses - goes
 in `AIMemory/`.
@@ -578,7 +577,7 @@ Vendor: <Anthropic | OpenAI | Google | xAI | Mistral | DeepSeek | Meta | other>
 Capabilities: <comma-separated generic tags from the list above>
 Strengths: <1 line>
 Context: <token budget or "unknown">
-Harness: <Claude Code | Cursor | Aider | ChatGPT-tools | Continue | Web chat | mobile | API direct | unknown>
+Harness: <Claude Code | Aider | ChatGPT-tools | Continue | Web chat | mobile | API direct | unknown>
 Notes: <anything relevant - e.g. "preview model", "no internet", "Korean UI">
 ```
 
@@ -720,6 +719,18 @@ details to `.agent-work-mux/agents.local.md`. Re-run the probe when an agent CLI
 version changes. `/awm agents hints` reads existing hints without calling
 agents.
 
+Known headless worker surfaces include Codex `codex exec --json`, OpenCode
+`opencode run --format json`, Gemini CLI `gemini --prompt ... --approval-mode
+plan --output-format json`, Continue CLI `cn --readonly -p ... --format json`
+and `cn serve --port <port>`, Aider `aider --message ...`, and Claude Code
+`claude -p ... --output-format json` when installed. Prefer safe planning or
+read-only modes when a tool provides them. Classify editor launchers such as
+Antigravity `chat` and Cursor `--chat` as `gui_only` unless they return a
+machine-readable stdout stream or result file. For Continue with DeepSeek, any
+working Continue secret setup is acceptable; if local env fallback returns a
+DeepSeek 401, use an explicit local config secret reference such as
+`apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`.
+
 Plain natural language remains valid for normal collaboration, planning, and
 manual handoffs. It does not authorize headless dispatch. If intent is
 ambiguous, ask a short confirmation or provide a dry-run plan.
@@ -847,6 +858,7 @@ If `--selector` is provided, validate and use that selector; if `--as` is
 provided, use that alias. Normalize selector-like local-language text before
 validation, so `오픈코드:딥시크` becomes `opencode:deepseek:auto`. Without flags,
 infer known words such as `opencode`, `open code`, or `오픈코드` -> `opencode`,
+`continue`, `cn`, or `컨티뉴` -> `continue`, `aider` or `에이더` -> `aider`,
 and `deepseek` or `딥시크` -> `deepseek`. A description containing both runner
 and model/provider defaults to `<runner>:<model-or-tier>:auto` with alias
 `<runner>-<model-or-tier>`, so `오픈코드의 딥시크` registers

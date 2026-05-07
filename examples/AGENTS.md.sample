@@ -35,8 +35,11 @@ by task difficulty and records the choice in the goal record.
 | claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Choose model/profile by task difficulty. |
 | claude-max | claude:opus-4.7:max | filesystem-read, filesystem-write, shell-exec, subagent-spawn | Expensive/high-context profile. |
 | codex | codex:gpt-5-codex:auto | filesystem-read, filesystem-write, shell-exec | Implementation and review. |
+| opencode | opencode:auto:auto | filesystem-read, filesystem-write, shell-exec | Run `/awm agents test opencode --smoke` before dispatch. |
 | opencode-deepseek | opencode:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Registered from `/awm agents add 오픈코드의 딥시크`; run `/awm agents test opencode-deepseek --smoke` before dispatch. |
 | 딥시크 | opencode:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Registered from `/awm agent add 딥시크 오픈코드:딥시크` or `/awm agent add 딥시크 오픈코드의 딥시크`; run `/awm agents test 딥시크 --smoke` before dispatch. |
+| continue-deepseek | continue:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Continue CLI `cn` supports headless JSON, `cn serve`, and `--readonly`; run `/awm agents test continue-deepseek --smoke` before dispatch. |
+| aider-deepseek | aider:deepseek:auto | filesystem-read, filesystem-write, shell-exec | Aider supports headless `--message`; run `/awm agents test aider-deepseek --smoke` before dispatch. |
 | gemini-pro | gemini:pro:auto | filesystem-read, web-search, image-input | Use when multimodal or long-context search is needed. |
 
 ## Agent registration notes
@@ -61,7 +64,11 @@ Do not add them here.
 ## Agent call hints
 | Agent | Last tested | CLI/version | Headless status | Invocation hint | Telemetry | Known quirks |
 |-------|-------------|-------------|-----------------|-----------------|-----------|--------------|
-| opencode | 2026-05-07 | opencode 1.14.33 | pass | `opencode run --model <provider/model> --format json "<prompt>"` | reported tokens/cost in `step_finish` | Put message before repeated `--file` args. |
-| codex | 2026-05-07 | codex-cli 0.128.0 | pass_with_warnings | `codex exec --ephemeral --json -o <file> "<prompt>"` | reported tokens in `turn.completed` | Plugin sync 403 warnings can be non-fatal if final message exists. |
-| antigravity | 2026-05-07 | Antigravity 1.107.0 | retest_required | `antigravity chat --mode ask "<prompt>"` | none on stdout | Service/headless behavior deferred; test only until revalidated. |
-| claude | 2026-05-07 | unknown | missing_path | configure locally | unknown | `claude` not found on PATH in this probe. |
+| opencode | 2026-05-08 | opencode 1.14.33 | pass | `opencode run --model deepseek/deepseek-v4-flash --format json "<prompt>"` | JSON events include `step_finish` tokens/cost | Put message before repeated `--file` args. |
+| continue | 2026-05-08 | Continue CLI 1.5.45 | pass | `cn [--config <config-if-needed>] --readonly -p "<prompt>" --format json` | JSON output in headless mode; `cn serve --port <port>` `/state` passed | Any working Continue secret setup is valid; local env fallback needed explicit `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` on this probe. |
+| codex | 2026-05-08 | codex-cli 0.128.0 | pass_with_warnings | `codex exec --ephemeral --json --output-last-message <file> --cd <project> "<prompt>"` | JSONL `turn.completed` usage reports tokens | Plugin sync 403, shell snapshot, and manifest/skill loader warnings can be non-fatal if the final message exists. |
+| gemini | 2026-05-08 | gemini-cli 0.41.2 | pass | `gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust` | JSON stats include token/tool/file counters | Use plan mode for read-only smoke probes. |
+| aider | 2026-05-08 | aider 0.86.2 | pass | `aider --model deepseek/deepseek-chat --message "<prompt>" --no-git --no-auto-commits --no-stream --no-pretty --yes-always --no-analytics --input-history-file .agent-work-mux/tmp/aider/input.history --chat-history-file .agent-work-mux/tmp/aider/chat.history.md --llm-history-file .agent-work-mux/tmp/aider/llm.history` | stdout includes tokens/cost | Include "Do not edit files" in smoke prompts; redirect history files to ignored local state. |
+| antigravity | 2026-05-08 | Antigravity 1.107.0 | gui_only | `antigravity chat --mode ask "<prompt>"` | none | Opens/targets GUI chat and returned no machine-readable result. |
+| cursor | 2026-05-08 | Cursor 3.3.22 | gui_only | `<Cursor install>/resources/app/bin/cursor.cmd --chat` | none | Editor/chat launcher only; may not be on PATH. |
+| claude | 2026-05-08 | Claude Code 2.1.132 | billing_blocked | `claude -p "<prompt>" --output-format json --permission-mode plan --no-session-persistence` | JSON result with usage/error metadata | CLI and auth are present; live completion was blocked by billing/quota or probe budget. |

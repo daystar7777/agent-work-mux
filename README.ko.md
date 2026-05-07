@@ -4,10 +4,13 @@
 
 > AI 코딩 에이전트를 위한 마크다운 기반 작업 기억과 작업 라우팅 프로토콜.
 
-AgentWorkMux는 Claude Code, ChatGPT Codex CLI, OpenCode, Antigravity,
-Cursor, Aider, Cline, Continue, Windsurf, gemini-cli 같은 에이전트들이 같은
-프로젝트 기억을 읽고, 목표 단위 작업을 나누고, 세션이 바뀌어도 이어서 일할
-수 있게 해줍니다.
+AgentWorkMux는 Claude Code, ChatGPT Codex CLI, OpenCode, Aider,
+Continue, gemini-cli 같은 headless 가능 파일 에이전트들이 같은 프로젝트 기억을
+읽고, 목표 단위 작업을 나누고, 세션이 바뀌어도 이어서 일할 수 있게 해줍니다.
+
+Headless worker 지원은 마크다운 호환 범위보다 좁게 봅니다. 현재 probe에서
+Cursor와 Antigravity처럼 창이나 chat만 여는 editor launcher는 stdout이나 결과
+파일을 machine-readable하게 돌려주기 전까지 `gui_only`로 분류합니다.
 
 기본 저장소는 `AIMemory/`이고, 가장 중요한 사용법은 `/awm goal`입니다.
 
@@ -159,6 +162,27 @@ worker를 실행하지 않습니다.
 
 에이전트 버전이 바뀌면 probe를 다시 돌려서 invocation hint와 알려진 오류/교정법을
 갱신합니다. `/awm agents hints`는 agent를 호출하지 않고 기존 힌트만 읽습니다.
+
+현재 검증된 worker smoke 형태는 `opencode run --format json`, `codex exec
+--json`, `gemini --prompt ... --approval-mode plan --output-format json`,
+`aider --message ... --no-git --no-auto-commits`에 history 파일을
+`.agent-work-mux/tmp/` 아래로 돌리는 형태, Continue의 `cn --readonly -p ...
+--format json`입니다.
+
+Continue는 IDE 전용이 아니라 `cn` CLI로도 지원합니다. `cn -p "<prompt>"`는
+headless 1샷 호출이고, `--format json`은 machine-readable 출력을 제공합니다.
+`cn serve --port <port>`는 `/state`, `/message` HTTP server 표면을 엽니다.
+`--readonly`는 plan/read-only mode이며, `--allow`, `--ask`, `--exclude`로
+tool별 권한을 조절할 수 있습니다. DeepSeek은 Continue가 지원하는 어떤 secret
+설정이든 model `apiKey`에 제대로 연결되어 있으면 그대로 쓰면 됩니다. 다만
+local env fallback에서 `Bearer sk-` 문구가 들어간 DeepSeek 401이 나면, 그 로컬
+config에는 `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` 같은 명시적 secret
+reference를 추가합니다.
+
+Claude Code는 `claude -p "<prompt>" --output-format json --permission-mode
+plan`으로 headless probe를 실행합니다. CLI와 로그인은 확인됐지만 계정 결제,
+quota, 또는 probe budget cap 때문에 live completion이 막히면 `missing_path`가
+아니라 `billing_blocked`로 분류합니다.
 
 ---
 

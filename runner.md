@@ -81,6 +81,18 @@ worker invocations with tiny smoke prompts. It stores raw logs in ignored
 `.agent-work-mux/probes/`, updates compact hints in `AIMemory/AGENTS.md`, and
 records local details in `.agent-work-mux/agents.local.md`.
 
+Known headless worker surfaces include Codex `codex exec --json`, OpenCode
+`opencode run --format json`, Gemini CLI `gemini --prompt ... --approval-mode
+plan --output-format json`, Continue CLI `cn --readonly -p ... --format json`
+and `cn serve --port <port>`, Aider `aider --message ...`, and Claude Code
+`claude -p ... --output-format json` when installed. Prefer safe planning or
+read-only modes when a tool provides them. Classify editor launchers such as
+Antigravity `chat` and Cursor `--chat` as `gui_only` unless they return a
+machine-readable stdout stream or result file. For Continue with DeepSeek, any
+working Continue secret setup is acceptable; if local env fallback returns a
+DeepSeek 401, use an explicit local config secret reference such as
+`apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`.
+
 `/awm agents hints` reads those hints without calling agents.
 
 `/awm goal` defaults to auto-run after parsing and planning. Before dispatch,
@@ -222,6 +234,8 @@ Parsing rules:
    `오픈코드:딥시크` becomes `opencode:deepseek:auto`.
 6. Without flags, infer a selector from known public words, including:
    `opencode`, `open code`, `오픈코드` -> `opencode`;
+   `continue`, `cn`, `컨티뉴` -> `continue`;
+   `aider`, `에이더` -> `aider`;
    `deepseek`, `딥시크` -> `deepseek`;
    `claude`, `클로드` -> `claude`;
    `codex`, `코덱스` -> `codex`;
@@ -234,10 +248,11 @@ Parsing rules:
    ask before replacing it.
 10. If inference is ambiguous, ask for `--as` or `--selector`.
 
-Default capability hints are conservative: `opencode`, `claude`, and `codex`
-get `filesystem-read, filesystem-write, shell-exec`; `gemini` gets
-`filesystem-read, web-search, image-input`; unknown agents get `unknown` until
-tested. Add a note such as `Registered from "/awm agent add 딥시크 오픈코드의 딥시크"; run /awm agents test 딥시크 --smoke before dispatch.`
+Default capability hints are conservative: `opencode`, `continue`, `aider`,
+`claude`, and `codex` get `filesystem-read, filesystem-write, shell-exec`;
+`gemini` gets `filesystem-read, web-search, image-input`; unknown agents get
+`unknown` until tested. Add a note such as `Registered from "/awm agent add
+딥시크 오픈코드의 딥시크"; run /awm agents test 딥시크 --smoke before dispatch.`
 
 ## Goal record schema
 

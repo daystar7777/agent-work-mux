@@ -22,11 +22,8 @@ on the user's project. Known compatible agent platforms:
 | Claude Code           | Claude Opus / Sonnet / Haiku         |
 | ChatGPT Codex (CLI)   | GPT-5 / GPT-5-Codex                  |
 | OpenCode              | any (via provider config)            |
-| Antigravity           | Gemini family                        |
-| Cursor (agent mode)   | Claude / GPT / Gemini                |
 | Aider                 | any (via provider config)            |
-| Cline / Continue      | any (via provider config)            |
-| Windsurf              | proprietary + others                 |
+| Continue              | any (via provider config)            |
 | Codex CLI / gemini-cli| GPT-5-Codex / Gemini-2.5-Pro         |
 
 If you're a chat-only LLM (web ChatGPT free, Claude.ai chat without tools,
@@ -52,8 +49,7 @@ State at the top of your reply:
 - **Vendor**: Anthropic / OpenAI / Google / xAI / Mistral / DeepSeek /
   Meta / Alibaba / other.
 - **Harness** (the agent platform running you): Claude Code / ChatGPT
-  Codex CLI / OpenCode / Antigravity / Cursor / Aider / Cline /
-  Continue / Windsurf / gemini-cli / other (name it).
+  Codex CLI / OpenCode / Aider / Continue / gemini-cli / other (name it).
 - **Capabilities** - pick from this **vendor-neutral** set,
   comma-separated. Map your actual tools to these generic tags
   (do NOT report vendor names like "Bash", "Read", "Edit", "Browser"):
@@ -117,7 +113,6 @@ Known locations:
 |---------|------|--------|
 | Claude Code | `CLAUDE.md` | markdown |
 | ChatGPT Codex CLI | `.codex/instructions.md` | markdown |
-| Cursor | `.cursorrules` | text |
 | Aider | `.aider.conf.yml` | yaml |
 
 Use a sentinel block:
@@ -232,9 +227,8 @@ unless the user explicitly asks for a separate human-facing translation.
 Every markdown file you author lives under `AIMemory/`.
 
 Exceptions - files that specific harnesses load from fixed paths
-(e.g. Claude Code reads `CLAUDE.md` from project root; Cursor reads
-`.cursorrules`). If your harness has such a file, it stays where the
-harness expects it.
+(e.g. Claude Code reads `CLAUDE.md` from project root). If your harness has
+such a file, it stays where the harness expects it.
 
 Everything else - notes, plans, reviews, scratch, design docs, analyses - goes
 in `AIMemory/`.
@@ -786,7 +780,7 @@ Vendor: <Anthropic | OpenAI | Google | xAI | Mistral | DeepSeek | Meta | other>
 Capabilities: <comma-separated generic tags from the list above>
 Strengths: <1 line>
 Context: <token budget or "unknown">
-Harness: <Claude Code | Cursor | Aider | ChatGPT-tools | Continue | Web chat | mobile | API direct | unknown>
+Harness: <Claude Code | Aider | ChatGPT-tools | Continue | Web chat | mobile | API direct | unknown>
 Notes: <anything relevant - e.g. "preview model", "no internet", "Korean UI">
 ```
 
@@ -928,6 +922,18 @@ details to `.agent-work-mux/agents.local.md`. Re-run the probe when an agent CLI
 version changes. `/awm agents hints` reads existing hints without calling
 agents.
 
+Known headless worker surfaces include Codex `codex exec --json`, OpenCode
+`opencode run --format json`, Gemini CLI `gemini --prompt ... --approval-mode
+plan --output-format json`, Continue CLI `cn --readonly -p ... --format json`
+and `cn serve --port <port>`, Aider `aider --message ...`, and Claude Code
+`claude -p ... --output-format json` when installed. Prefer safe planning or
+read-only modes when a tool provides them. Classify editor launchers such as
+Antigravity `chat` and Cursor `--chat` as `gui_only` unless they return a
+machine-readable stdout stream or result file. For Continue with DeepSeek, any
+working Continue secret setup is acceptable; if local env fallback returns a
+DeepSeek 401, use an explicit local config secret reference such as
+`apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`.
+
 Plain natural language remains valid for normal collaboration, planning, and
 manual handoffs. It does not authorize headless dispatch. If intent is
 ambiguous, ask a short confirmation or provide a dry-run plan.
@@ -1051,6 +1057,7 @@ If `--selector` is provided, validate and use that selector; if `--as` is
 provided, use that alias. Normalize selector-like local-language text before
 validation, so `오픈코드:딥시크` becomes `opencode:deepseek:auto`. Without flags,
 infer known words such as `opencode`, `open code`, or `오픈코드` -> `opencode`,
+`continue`, `cn`, or `컨티뉴` -> `continue`, `aider` or `에이더` -> `aider`,
 and `deepseek` or `딥시크` -> `deepseek`. A description containing both runner
 and model/provider defaults to `<runner>:<model-or-tier>:auto` with alias
 `<runner>-<model-or-tier>`, so `오픈코드의 딥시크` registers
@@ -1295,7 +1302,7 @@ your own self-introspection):
 ```
 ### YYYY-MM-DD HH:MM | <your-model-id> | PROJECT_BOOTSTRAPPED
 Vendor: <Anthropic|OpenAI|Google|xAI|Mistral|DeepSeek|Meta|other>
-Harness: <Claude Code|ChatGPT Codex CLI|OpenCode|Antigravity|Cursor|Aider|Cline|Continue|Windsurf|gemini-cli|other>
+Harness: <Claude Code|ChatGPT Codex CLI|OpenCode|Aider|Continue|gemini-cli|other>
 Capabilities: <comma-separated generic tags - filesystem-read, filesystem-write, shell-exec, web-fetch, web-search, code-sandbox, image-input, subagent-spawn, ...>
 Strengths: <one line>
 Context: <token budget or "unknown">
@@ -1685,6 +1692,9 @@ by task difficulty and records the choice in the goal record.
 |-------|-------------|--------------|-------|
 | claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Orchestrator chooses model/profile by difficulty. |
 | codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Useful for implementation/review loops. |
+| opencode | opencode:auto:auto | filesystem-read, filesystem-write, shell-exec | Use `/awm agents test opencode --smoke` before dispatch. |
+| continue | continue:auto:auto | filesystem-read, filesystem-write, shell-exec | Continue CLI `cn` supports headless JSON and `--readonly`. |
+| aider | aider:auto:auto | filesystem-read, filesystem-write, shell-exec | Use `--message` for headless smoke probes. |
 | gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Adjust to actual project setup. |
 
 ## Agent registration notes

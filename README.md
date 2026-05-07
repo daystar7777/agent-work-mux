@@ -8,9 +8,14 @@
 [![Status: stable](https://img.shields.io/badge/Status-stable-green.svg)]()
 [![Version: v3](https://img.shields.io/badge/Version-v3--orchestration-blue.svg)]()
 
-AgentWorkMux lets Claude Code, ChatGPT Codex CLI, OpenCode, Antigravity, Cursor,
-Aider, Cline, Continue, Windsurf, gemini-cli, and other file-capable agents
-share project memory, route work, run explicit goals, and resume across sessions.
+AgentWorkMux lets Claude Code, ChatGPT Codex CLI, OpenCode, Aider, Continue,
+gemini-cli, and other headless-capable file agents share project memory, route
+work, run explicit goals, and resume across sessions.
+
+Headless worker support is intentionally narrower than markdown compatibility.
+Editor launchers that only open windows or chats, such as Cursor and
+Antigravity in current probes, are classified as `gui_only` until they return a
+machine-readable stdout stream or result file.
 
 It is markdown-first. The durable state lives in `AIMemory/`; the main command
 surface is `/awm`.
@@ -342,6 +347,27 @@ Hints capture the working invocation, CLI version, headless status, telemetry
 shape, known warnings, and corrected commands after failures. Re-run the probe
 when an agent version changes. Use `/awm agents hints` to read the current
 hints without calling any agent.
+
+Current verified worker smoke shapes include `opencode run --format json`,
+`codex exec --json`, `gemini --prompt ... --approval-mode plan --output-format
+json`, `aider --message ... --no-git --no-auto-commits` with history files
+redirected under `.agent-work-mux/tmp/`, and Continue's `cn --readonly -p ...
+--format json`.
+
+Continue is supported through its `cn` CLI, not just the IDE. `cn -p "<prompt>"`
+runs a headless one-shot, `--format json` provides machine-readable output, and
+`cn serve --port <port>` exposes an HTTP server surface with `/state` and
+`/message`. `--readonly` gives a plan/read-only mode. Use `--allow`, `--ask`,
+or `--exclude` for per-tool permission gates before enabling edits. For
+DeepSeek, any Continue-supported secret setup is fine as long as it populates
+the model `apiKey`. If local env fallback produces a DeepSeek 401 with
+`Bearer sk-` wording, use an explicit secret reference such as
+`apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` in that local config.
+
+Claude Code uses `claude -p "<prompt>" --output-format json --permission-mode
+plan` for headless probes. If the CLI and login are present but account
+billing, quota, or a probe budget cap prevents a live completion, classify the
+result as `billing_blocked`, not `missing_path`.
 
 ---
 
