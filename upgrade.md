@@ -1,83 +1,131 @@
-# Upgrade: agent-work-mem v1 → v2 (tiered storage + index + onboarding primer)
+# Upgrade: AgentWorkMux v1/v2 -> v3
 
-> If your project already has `AIMemory/PROTOCOL.md` and `AIMemory/work.log`
-> from a previous bootstrap of agent-work-mem, paste this prompt into your
-> agent (Claude Code, ChatGPT Codex CLI, OpenCode, Antigravity, Cursor, etc.)
-> to migrate to the v2 layout: `INDEX.md`, `PROJECT_OVERVIEW.md`,
-> `archive/`, `cold/`, and the new tiering rules.
+> Use this prompt when a project already has `AIMemory/PROTOCOL.md` and
+> `AIMemory/work.log`, but is missing v3 lifecycle, alias, and goal
+> orchestration files.
 >
-> Easiest one-line invocation:
+> One-line invocation:
 >
-> > "Fetch <https://raw.githubusercontent.com/daystar7777/agent-work-mem/main/upgrade.md>
-> >  and execute it on this project."
->
-> The agent will WebFetch this file and run the tasks below.
+> > "Fetch <https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/upgrade.md>
+> > and execute it on this project."
+
+The migration is non-destructive. Existing `AIMemory/` history is preserved.
+v3 adds:
+
+- `AIMemory/INSTALLATION.md` - install/reinstall lifecycle metadata
+- `AIMemory/AGENTS.md` - project-scoped safe aliases and routing policy
+- `AIMemory/goals/ACTIVE.md` - active `/awm` goal cursor and resume checkpoint
+- `AIMemory/goals/INDEX.md` - lazy goal history ledger and status dashboard
+- `AIMemory/goals/` - `/awm goal` contracts, compact results, and errors
+- lifecycle events: `UNINSTALLED`, `RE_INSTALLED`
+- goal events: `GOAL_CREATED`, `GOAL_UPDATED`, `GOAL_COMPLETED`,
+  `RUNNER_RESULT`
+- lazy CLI runner contract; raw runner logs stay in ignored `.agent-work-mux/`
+- lazy agent call probe; raw probe logs stay in ignored `.agent-work-mux/probes/`
+
+This upgrade prompt is for older AIMemory schemas. If deprecated
+`agent-work-mem` install markers are present, do not inline that legacy
+migration here. Lazy-load `migration.md` and run the one-time rename migration
+there so future sessions do not carry legacy context.
+
+## Your tasks
+
+### Task 0 - Verify state
+
+Check that `AIMemory/PROTOCOL.md` and `AIMemory/work.log` exist.
+
+```bash
+test -f AIMemory/PROTOCOL.md && test -f AIMemory/work.log && echo OK || echo "no install - run prompt.md instead"
+```
+
+If they do not exist, stop and run the bootstrap prompt instead:
+<https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/prompt.md>
+
+### Task 1 - Identify yourself
+
+State:
+
+- Model-id
+- Vendor
+- Harness
+- Capabilities using vendor-neutral tags from `PROTOCOL.md`
+
+### Task 2 - Read current memory
+
+Read:
+
+1. `AIMemory/INDEX.md` if present
+2. `AIMemory/PROJECT_OVERVIEW.md` if present
+3. The last 50 lines of `AIMemory/work.log`
+
+Check for an orphan `WORK_START`. If one exists, ask the user whether to
+resume that work or continue the upgrade.
+
+### Task 3 - Fetch or write the canonical v3 protocol
+
+Create missing directories:
+
+```bash
+mkdir -p AIMemory/archive AIMemory/cold AIMemory/goals
+```
+
+If `AIMemory/goals/ACTIVE.md` is missing, create:
+
+```markdown
+# Active Goal Cursor
+
+**Current goal-id**: none
+**State**: none
+**Orchestrator**: none
+**Goal record**: none
+**Last completed task**: none
+**Next checkpoint**: none
+**Raw-log root**: none
+**Final report written**: false
+
+## Resume note
+
+No active `/awm goal` yet.
+```
+
+If `AIMemory/goals/INDEX.md` is missing, create:
+
+```markdown
+# Goal History
+
+## Summary
+- Total goals: 0
+- Active: 0
+- Awaiting user: 0
+- Paused: 0
+- Error paused: 0
+- Stopped: 0
+- Complete: 0
+
+## Goals
+| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Tokens | Cost | Final report | Record |
+|---------|-----------|-------|---------|---------|-----------|--------------|--------|--------|------|--------------|--------|
+| (none) | | | | | | | | | | | |
 
 ---
-
-You are upgrading an existing AIMemory installation from the original
-flat-file layout (just `PROTOCOL.md` + `work.log`) to the v2 tiered
-layout. The new layout adds:
-
-- `AIMemory/INDEX.md` — file inventory + topic search
-- `AIMemory/PROJECT_OVERVIEW.md` — onboarding primer for new sessions/LLMs
-- `AIMemory/archive/` — warm tier (rotated old events)
-- `AIMemory/cold/` — cold tier (period digests, on-demand)
-- New rules in `PROTOCOL.md` §7 (tiered storage)
-
-The migration is non-destructive — your existing `work.log` keeps every
-byte; older events just get moved into dated archive files if your log
-has grown past the rotation threshold.
-
-## Your tasks (in order)
-
-### Task 0 — Verify state
-
-Check that `AIMemory/PROTOCOL.md` and `AIMemory/work.log` already exist.
-If they don't, this isn't an upgrade — run the bootstrap prompt instead
-(<https://raw.githubusercontent.com/daystar7777/agent-work-mem/main/prompt.md>).
-
-```bash
-test -f AIMemory/PROTOCOL.md && test -f AIMemory/work.log && echo OK || echo "no v1 install — run bootstrap instead"
+Last update: <YYYY-MM-DD HH:MM> by <model-id>
 ```
 
-### Task 1 — Identify yourself
-
-State at the top of your reply:
-
-- **Model-id** (lowercase kebab-case)
-- **Vendor**
-- **Harness** (Claude Code / ChatGPT Codex CLI / OpenCode / Antigravity /
-  Cursor / Aider / Cline / Continue / Windsurf / gemini-cli / other)
-- **Capabilities** (vendor-neutral tags: `filesystem-read`,
-  `filesystem-write`, `shell-exec`, `web-fetch`, `web-search`, `code-sandbox`,
-  `image-input`, `subagent-spawn`)
-
-### Task 2 — Fetch the canonical PROTOCOL.md
+Fetch the current protocol:
 
 ```bash
-mkdir -p AIMemory/archive AIMemory/cold
-```
-
-Then fetch the latest PROTOCOL.md from the upstream repo, replacing the
-existing file (your data in `work.log` is untouched):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/daystar7777/agent-work-mem/main/PROTOCOL.md \
+curl -fsSL https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/PROTOCOL.md \
   -o AIMemory/PROTOCOL.md
 ```
 
-If your harness doesn't allow `curl`, use your `web-fetch` tool to load
-the URL above and write the content to `AIMemory/PROTOCOL.md`.
+If `curl` is unavailable, use your web-fetch tool or copy the canonical
+`PROTOCOL.md` content from the repo.
 
-### Task 3 — Create INDEX.md (with current state reflected)
+### Task 4 - Backfill `INDEX.md`
 
-Write `AIMemory/INDEX.md` using the template below. Populate the
-"Other notable files" section by scanning the existing `AIMemory/`
-directory for any files beyond `PROTOCOL.md` / `work.log` /
-`INDEX.md` / `PROJECT_OVERVIEW.md`. List handoff files under
-"Active handoffs" if their content suggests they are still open
-(no `HANDOFF_CLOSED` corresponding event in work.log).
+If `AIMemory/INDEX.md` is missing, create it. If it exists, update it.
+
+Required v3 sections:
 
 ```markdown
 # AIMemory Index
@@ -85,166 +133,176 @@ directory for any files beyond `PROTOCOL.md` / `work.log` /
 ## Configuration
 - HOT_RETENTION_EVENTS: 50
 
-## Hot — read every session
-- work.log — last N events, append-only
+## Hot - read every session
+- work.log - last N events, append-only
+- INSTALLATION.md - small install/reinstall metadata
+- AGENTS.md - project-scoped safe aliases and routing policy
+- goals/ACTIVE.md - active `/awm` goal cursor; read before resuming goal work
+- goals/ - goal contracts and compact results only when relevant
 
-## Warm — read only when needed
+## Warm - read only when needed
 | File | Date range | Events | Topics | Summary |
 |------|------------|--------|--------|---------|
-(none yet — populated when work.log first rotates)
+(none yet - populated when work.log rotates)
 
-## Cold — fetch only on explicit need
+## Cold - fetch only on explicit need
 | File | Period covered | Topics | Summary |
 |------|----------------|--------|---------|
 (none yet)
 
-## Topic index — grep me
-(none yet — keywords appear here as archives are created)
+## Topic index - grep me
+(none yet - keywords appear here as archives are created)
 
 ## Active handoffs (open AICP threads)
-<list any handoff_*.md files in AIMemory/ that haven't been HANDOFF_CLOSED
-in work.log; if none, write "(none)">
+<list open handoff_*.md files, or "(none)">
+
+## Active goals
+- goals/ACTIVE.md -> current goal: <goal-id or none>
+- goals/INDEX.md -> lazy goal history ledger for `/awm goal list`
+- <list active/paused/error_paused goals, or "(none)">
 
 ## Other notable files
-- PROTOCOL.md — the rules
-- PROJECT_OVERVIEW.md — onboarding primer
-<add any other markdown files you find in AIMemory/, with a 1-line summary>
+- PROTOCOL.md - the rules
+- PROJECT_OVERVIEW.md - onboarding primer
+- goals/ACTIVE.md - active goal cursor; read before resuming `/awm goal`
+- goals/INDEX.md - lazy goal history ledger; read for `/awm goal list`
+- runner.md / RUNNER.md - lazy runner spec; read only for explicit `/awm`
 
 ---
-Last update: <YYYY-MM-DD HH:MM> by <your-model-id>
+Last update: <YYYY-MM-DD HH:MM> by <model-id>
 ```
 
-### Task 4 — Generate PROJECT_OVERVIEW.md from existing work.log
+### Task 5 - Backfill `PROJECT_OVERVIEW.md`
 
-This is the most useful part of the upgrade for existing projects: you
-read the entire `work.log` and synthesize a project primer from it.
+If missing, synthesize it from `work.log`. If present, keep existing content
+and add only durable v3 context if needed:
 
-1. Read all of `AIMemory/work.log`.
-2. Extract:
-   - The project's purpose (often visible from the first PROMPT events)
-   - Tech stack (from FILES_CREATED paths, package install events, etc.)
-   - Key decisions (look for NOTE events, decisions in PROMPT/WORK_END)
-   - Major work completed (WORK_END events with significant FILES_CREATED)
-   - Active concerns (open WORK_START without WORK_END, open handoffs)
-3. Write `AIMemory/PROJECT_OVERVIEW.md` using this structure:
+- Recent activity: `AIMemory/work.log`
+- Topic-based history: `AIMemory/INDEX.md`
+- Active goal cursor: `AIMemory/goals/ACTIVE.md`
+- Goal history ledger: `AIMemory/goals/INDEX.md`
+- Goal records: `AIMemory/goals/`
+- Lazy runner: `runner.md` or `AIMemory/RUNNER.md`, only for explicit `/awm`
+
+Do not invent project facts. Use `<TODO: ask user>` if the log does not
+contain enough information.
+
+### Task 6 - Create or update `INSTALLATION.md`
+
+If missing, create:
 
 ```markdown
-# Project Overview
+# AIMemory Installation
 
-> Onboarding for new LLMs joining this project. Read this AFTER
-> AIMemory/INDEX.md (which tells you what files exist) and BEFORE
-> AIMemory/work.log tail (which tells you what's happening right now).
+## Schema
+- protocol_version: v3
+- installer_version: upgrade.md from main or <commit SHA>
+- bootstrapped_at: <unknown or original timestamp>
+- bootstrapped_by: <unknown or original model @ harness>
+- upgraded_at: <ISO-8601 timestamp>
+- upgraded_by: <model-id> @ <harness>
+- runner_declaration: none
 
-## What is this project?
-<2–4 sentences synthesized from the log. If unclear, ASK the user
-during this upgrade and incorporate their answer.>
+## Harness files modified
+| Path | Format | Sentinel hash | Line range | Purpose |
+|------|--------|---------------|------------|---------|
+| (none known - legacy upgrade did not backfill sentinel blocks) | | | | |
 
-## Tech stack
-- <bullets — infer from work.log: file extensions, install events,
-  framework mentions in PROMPT/WORK_START events>
+## Lifecycle history
+| Timestamp | Event | Model | Summary |
+|-----------|-------|-------|---------|
+| <ISO-8601> | RE_INSTALLED | <model-id> | Upgraded existing AIMemory to v3 metadata. |
 
-## Key decisions locked in
-- <decision> (YYYY-MM-DD, <model-id>) — <one-line rationale>
-- <decision 2> ...
-<at least 3–8 bullets if the log has any meaningful history. If only a
-few events, just list what you can.>
+## Reinstall history
+| Timestamp | Previous installer | New installer | Model | AIMemory state |
+|-----------|--------------------|---------------|-------|----------------|
+| <ISO-8601> | unknown | v3 upgrade.md | <model-id> | reused |
 
-## Major work completed
-- <YYYY-MM-DD>: <what shipped or finished>
-- ...
+## Private data policy
 
-## Active concerns
-- <what's currently being worked on or blocked>
-
-## Where to look
-- Recent activity → AIMemory/work.log
-- Topic-based history → AIMemory/INDEX.md (Topic index section)
-- Long-term history → AIMemory/cold/digest-*.md (none yet)
-
----
-Last rebuild: <YYYY-MM-DD> by <your-model-id>
-Source: synthesized from full work.log on upgrade (was v1 → v2)
+Secrets, credentials, auth tokens, and private machine paths are not allowed in
+this file. Put private overrides under ignored `.agent-work-mux/` files or
+environment variables.
 ```
 
-If you cannot synthesize a section from the log (genuinely no
-information), write `<TODO: ask user>` instead of inventing content.
+If it exists, append a new upgrade/reinstall row. Do not delete history.
 
-### Task 5 — Rotate if work.log is over threshold
+### Task 7 - Create or update `AGENTS.md`
 
-```bash
-EVENT_COUNT=$(grep -c '^### ' AIMemory/work.log)
-THRESHOLD=$(grep '^- HOT_RETENTION_EVENTS:' AIMemory/INDEX.md 2>/dev/null \
-  | awk -F: '{print $2}' | tr -d ' ')
-[ -z "$THRESHOLD" ] && THRESHOLD=50
+If missing, create:
 
-if [ "$EVENT_COUNT" -gt $((THRESHOLD * 3 / 2)) ]; then
-  echo "Rotation needed: $EVENT_COUNT events; will reduce to $THRESHOLD."
-fi
+```markdown
+# AIMemory Agents
+
+## Alias policy
+
+Agent selectors use `<agent>[:<model-or-tier>[:<profile>]]`.
+
+If only an agent name is provided, the orchestrator chooses the model/profile
+by task difficulty and records the choice in the goal record.
+
+## Default orchestration policy
+
+- default_policy: single_agent
+- verifier_required: user_selectable
+- headless_requires_explicit_awm: true
+- goal_auto_run_default: true
+- goal_cursor_file: AIMemory/goals/ACTIVE.md
+- goal_ledger_file: AIMemory/goals/INDEX.md
+- completion_guard_required: true
+- telemetry_policy: compact_only
+- agent_call_probe: lazy
+
+## Model and profile policy
+
+- model_or_tier labels are project-safe routing labels such as `auto`, `pro`,
+  `max`, `local`, or a public model name.
+- profile labels describe effort, context, or tool policy such as `auto`,
+  `standard`, `max`, or `readonly`.
+- Private executable paths, account names, provider credentials, and machine
+  paths never appear here.
+
+## Project aliases
+| Alias | Resolves to | Capabilities | Notes |
+|-------|-------------|--------------|-------|
+| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Orchestrator chooses model/profile by difficulty. |
+| codex | codex:auto:auto | filesystem-read, filesystem-write, shell-exec | Useful for implementation/review loops. |
+| gemini | gemini:auto:auto | filesystem-read, web-search, image-input | Adjust to actual project setup. |
+
+## Private overrides
+
+Private executable paths, account names, credentials, tokens, and local config
+belong in ignored `.agent-work-mux/agents.local.md` or environment variables.
+Do not add them here.
 ```
 
-If rotation is needed, perform it per PROTOCOL.md §7.5:
+If it exists, preserve user aliases and add only missing required policy keys.
 
-1. Acquire flock if available:
-   ```bash
-   exec 9>AIMemory/.rotation.lock
-   flock -n 9 || { echo "lock busy; skip rotation"; }
-   ```
-2. Read all events. Keep the most recent `THRESHOLD` events; archive the
-   rest.
-3. For each archived event, append to
-   `AIMemory/archive/work-<UTC-date-from-event>.log`.
-4. Atomically replace work.log with the kept events
-   (`mv AIMemory/work.log.new AIMemory/work.log`).
-5. Update INDEX.md: add a row in the Warm table for each archive file
-   created. Extract 3–7 topic keywords per archive (kebab-case,
-   lowercase, scanning the events for meaningful nouns/topics).
-6. Append the topic mappings to the "Topic index — grep me" section
-   of INDEX.md (one line per topic → file).
-7. Append a NOTE event in the (now small) work.log:
-   ```
-   ### YYYY-MM-DD HH:MM | <model-id> | NOTE
-   Rotated <N> events to AIMemory/archive/. Hot kept at <THRESHOLD>.
-   v1 → v2 upgrade.
-   ```
+### Task 8 - Rotate if needed
 
-If `EVENT_COUNT <= THRESHOLD * 1.5`, skip rotation — log is small enough.
+Count events in `AIMemory/work.log`. If over `HOT_RETENTION_EVENTS * 1.5`,
+rotate per `PROTOCOL.md`. If you cannot rotate safely, append a `NOTE` and
+leave rotation for a later single-agent session.
 
-### Task 6 — Append the upgrade event
+### Task 9 - Append upgrade event
 
-```bash
-cat >> AIMemory/work.log <<'EOF'
+Append:
 
-### YYYY-MM-DD HH:MM | <your-model-id> | RE_ENGAGED
-Vendor: <...>
-Harness: <...>
-Capabilities: <...>
-Strengths: <...>
-Context: <...>
-Notes: AIMemory upgraded v1 → v2 (tiered storage + INDEX.md + PROJECT_OVERVIEW.md).
-EOF
+```text
+### YYYY-MM-DD HH:MM | <model-id> | RE_INSTALLED
+Previous installer version: <unknown | v1 | v2 | sha/url>
+New installer version: v3 upgrade.md
+Schema delta summary: Added INSTALLATION.md, AGENTS.md, goals/ACTIVE.md, goals/INDEX.md, /awm command contract, lazy runner isolation.
+AIMemory state: reused
 ```
 
-### Task 7 — Confirm
+### Task 10 - Confirm
 
 Reply with:
-- Your model-id, vendor, harness, capabilities
-- New files created (`INDEX.md`, `PROJECT_OVERVIEW.md`, `archive/`, `cold/`)
-- Whether rotation ran (and if so, how many events archived to which dates)
-- Topic keywords extracted (if you rotated)
-- Any sections in PROJECT_OVERVIEW.md that you marked `<TODO: ask user>`
-  so the user can fill them in
-- One sentence: "I will follow the v2 PROTOCOL.md from this turn forward."
 
-### Optional Task 8 — Suggest topic refinement
-
-After your synthesis, the user may want to refine PROJECT_OVERVIEW.md or
-add more topic keywords to INDEX.md. Offer:
-
-> "I've synthesized PROJECT_OVERVIEW.md from your existing work.log. The
-> 'What is this project?' / 'Tech stack' / 'Key decisions' sections are
-> based on what I could infer. Want me to ask you specific questions to
-> sharpen any of those, or run with what I have?"
-
----
-
-Now execute the eight tasks. Begin.
+- Model-id, vendor, harness, capabilities
+- Files created or modified
+- Whether rotation ran
+- Any unresolved TODOs in `PROJECT_OVERVIEW.md`
+- Whether aliases are placeholders that need user confirmation
+- One sentence: "I will follow the v3 PROTOCOL.md from this turn forward."

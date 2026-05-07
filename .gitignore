@@ -9,3 +9,17 @@
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 .obsidian/cache
+
+# agent-work-mux local project memory
+AIMemory/
+
+# Agent harness local state
+.codex/
+.claude/
+.opencode/
+
+# agent-work-mux v3 runner local state
+.agent-work-mux/
+
+# Legacy runner local state from the former project name
+.agent-work-mem/

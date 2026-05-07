@@ -1,0 +1,30 @@
+# AIMemory Installation
+
+## Schema
+- protocol_version: v3
+- installer_version: https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/prompt.md
+- bootstrapped_at: 2026-05-07T08:30:00Z
+- bootstrapped_by: claude-opus-4-7 @ Claude Code
+- runner_declaration: none
+
+## Harness files modified
+| Path | Format | Sentinel hash | Line range | Purpose |
+|------|--------|---------------|------------|---------|
+| CLAUDE.md | markdown | sha256:examplehash | 12-18 | Persistent AgentWorkMux reminder. |
+| .codex/instructions.md | markdown | sha256:examplehash2 | 1-7 | Persistent AgentWorkMux reminder. |
+
+## Lifecycle history
+| Timestamp | Event | Model | Summary |
+|-----------|-------|-------|---------|
+| 2026-05-07T08:30:00Z | PROJECT_BOOTSTRAPPED | claude-opus-4-7 | Initial v3 install. |
+
+## Reinstall history
+| Timestamp | Previous installer | New installer | Model | AIMemory state |
+|-----------|--------------------|---------------|-------|----------------|
+| 2026-05-07T09:10:00Z | sha256:oldprompt | sha256:newprompt | gpt-5-codex | reused |
+
+## Private data policy
+
+Secrets, credentials, auth tokens, and private machine paths are not allowed in
+this file. Put private runner or harness overrides under ignored
+`.agent-work-mux/` files or environment variables.

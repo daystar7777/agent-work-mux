@@ -1,0 +1,51 @@
+# AIMemory Agents
+
+## Alias policy
+
+Agent selectors use `<agent>[:<model-or-tier>[:<profile>]]`.
+
+If only an agent name is provided, the orchestrator chooses the model/profile
+by task difficulty and records the choice in the goal record.
+
+## Default orchestration policy
+
+- default_policy: single_agent
+- verifier_required: user_selectable
+- headless_requires_explicit_awm: true
+- goal_auto_run_default: true
+- goal_cursor_file: AIMemory/goals/ACTIVE.md
+- goal_ledger_file: AIMemory/goals/INDEX.md
+- completion_guard_required: true
+- telemetry_policy: compact_only
+- agent_call_probe: lazy
+
+## Model and profile policy
+
+- model_or_tier labels are project-safe routing labels such as `auto`, `pro`,
+  `max`, `local`, or a public model name.
+- profile labels describe effort, context, or tool policy such as `auto`,
+  `standard`, `max`, or `readonly`.
+- Private executable paths, account names, provider credentials, and machine
+  paths never appear here.
+
+## Project aliases
+| Alias | Resolves to | Capabilities | Notes |
+|-------|-------------|--------------|-------|
+| claude | claude:auto:auto | filesystem-read, filesystem-write, shell-exec | Choose model/profile by task difficulty. |
+| claude-max | claude:opus-4.7:max | filesystem-read, filesystem-write, shell-exec, subagent-spawn | Expensive/high-context profile. |
+| codex | codex:gpt-5-codex:auto | filesystem-read, filesystem-write, shell-exec | Implementation and review. |
+| gemini-pro | gemini:pro:auto | filesystem-read, web-search, image-input | Use when multimodal or long-context search is needed. |
+
+## Private overrides
+
+Private executable paths, account names, credentials, tokens, and local config
+belong in ignored `.agent-work-mux/agents.local.md` or environment variables.
+Do not add them here.
+
+## Agent call hints
+| Agent | Last tested | CLI/version | Headless status | Invocation hint | Telemetry | Known quirks |
+|-------|-------------|-------------|-----------------|-----------------|-----------|--------------|
+| opencode | 2026-05-07 | opencode 1.14.33 | pass | `opencode run --model <provider/model> --format json "<prompt>"` | reported tokens/cost in `step_finish` | Put message before repeated `--file` args. |
+| codex | 2026-05-07 | codex-cli 0.128.0 | pass_with_warnings | `codex exec --ephemeral --json -o <file> "<prompt>"` | reported tokens in `turn.completed` | Plugin sync 403 warnings can be non-fatal if final message exists. |
+| antigravity | 2026-05-07 | Antigravity 1.107.0 | retest_required | `antigravity chat --mode ask "<prompt>"` | none on stdout | Service/headless behavior deferred; test only until revalidated. |
+| claude | 2026-05-07 | unknown | missing_path | configure locally | unknown | `claude` not found on PATH in this probe. |

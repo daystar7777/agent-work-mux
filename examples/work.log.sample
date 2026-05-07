@@ -9,13 +9,13 @@
 #
 # Events: PROMPT, WORK_START, WORK_END, FILES_CREATED, FILES_MODIFIED,
 #         FILES_MOVED, FILES_DELETED, HANDOFF, HANDOFF_RECEIVED,
-#         HANDOFF_CLOSED, NOTE, PROJECT_BOOTSTRAPPED, RE_ENGAGED, CORRECTION
+#         HANDOFF_CLOSED, NOTE, PROJECT_BOOTSTRAPPED, RE_ENGAGED,
+#         UNINSTALLED, RE_INSTALLED, GOAL_CREATED, GOAL_UPDATED,
+#         GOAL_COMPLETED, RUNNER_RESULT, CORRECTION
 #
 # Session-start events (PROJECT_BOOTSTRAPPED, RE_ENGAGED) MUST declare
-# Vendor / Harness / Capabilities / Strengths / Context — see PROTOCOL.md §8.
-# Race-free append discipline — see PROTOCOL.md §6.
-#
-# Read tail before every new user turn. See AIMemory/PROTOCOL.md.
+# Vendor / Harness / Capabilities / Strengths / Context. See PROTOCOL.md.
+# Race-free append discipline: see PROTOCOL.md.
 # ============================================================
 
 ### 2026-04-26 09:00 | claude-opus-4-5 | PROJECT_BOOTSTRAPPED
@@ -24,7 +24,7 @@ Harness: Claude Code
 Capabilities: filesystem-read, filesystem-write, shell-exec, web-fetch, web-search, subagent-spawn
 Strengths: long-context reasoning + code synthesis + multi-step orchestration
 Context: 200000
-Notes: AIMemory protocol installed. Multi-LLM collaboration enabled.
+Notes: AgentWorkMux protocol v3 installed. Multi-LLM collaboration enabled.
 
 ### 2026-04-26 09:02 | claude-opus-4-5 | PROMPT
 > Add JWT auth with refresh token rotation to the API.
@@ -42,7 +42,7 @@ rotation on each refresh, replay detection via token family.
 - /repo/AIMemory/handoff_auth-review.claude-opus-4-5.md
 
 ### 2026-04-26 09:25 | claude-opus-4-5 | HANDOFF
-→ gpt-5-codex: REVIEW_REQUEST for JWT auth implementation. Want a second
+-> gpt-5-codex: REVIEW_REQUEST for JWT auth implementation. Want a second
 pair of eyes on token rotation race conditions before merging.
 See handoff_auth-review.claude-opus-4-5.md. Priority: NORMAL. Reply by:
 when convenient.
@@ -69,42 +69,53 @@ Capability used: filesystem-read, code-sandbox
 - /repo/AIMemory/handoff_auth-review.gpt-5-codex.md
 
 ### 2026-04-26 14:33 | gpt-5-codex | HANDOFF_RECEIVED
-← claude-opus-4-5: handoff_auth-review.claude-opus-4-5.md
+-> claude-opus-4-5: handoff_auth-review.claude-opus-4-5.md
 Acknowledged. Replying in handoff_auth-review.gpt-5-codex.md
 (REVIEW_RESPONSE).
 
 ### 2026-04-26 14:33 | gpt-5-codex | HANDOFF
-→ claude-opus-4-5: REVIEW_RESPONSE. Found 1 race in refresh-rotation
-window (TOCTOU between read and revoke). Suggested mitigation in §3 of
-the response file. Priority: HIGH (blocking merge).
+-> claude-opus-4-5: REVIEW_RESPONSE. Found 1 race in refresh-rotation
+window (TOCTOU between read and revoke). Priority: HIGH (blocking merge).
 
 ### 2026-04-26 14:34 | gpt-5-codex | WORK_END
 Status: complete. Review delivered with 1 high-priority issue.
 
-### 2026-04-26 16:20 | claude-opus-4-5 | RE_ENGAGED
-Vendor: Anthropic
-Harness: Claude Code
-Capabilities: filesystem-read, filesystem-write, shell-exec, web-fetch, web-search, subagent-spawn
-Strengths: long-context reasoning + code synthesis + multi-step orchestration
-Context: 200000
-Notes: Resuming after morning auth work.
+### 2026-05-07 08:45 | gpt-5-codex | PROMPT
+> /awm goal "Ship the auth hardening slice. Claude implements, Codex reviews."
 
-### 2026-04-26 16:20 | claude-opus-4-5 | HANDOFF_RECEIVED
-← gpt-5-codex: handoff_auth-review.gpt-5-codex.md
-Acknowledged. Implementing the suggested DB-level lock to fix the
-TOCTOU race.
+### 2026-05-07 08:46 | gpt-5-codex | GOAL_CREATED
+Goal-id: auth-hardening-20260507
+State: active
+Auto-run: true
+Policy: implement_then_verify
+Record: AIMemory/goals/auth-hardening-20260507.md
+Active cursor: AIMemory/goals/ACTIVE.md
+Goal ledger: AIMemory/goals/INDEX.md row created
 
-### 2026-04-26 16:42 | claude-opus-4-5 | FILES_MODIFIED
-- /repo/src/auth/refresh.ts (added SELECT...FOR UPDATE around the
-  rotation transaction)
-- /repo/src/auth/__tests__/refresh.test.ts (new concurrent-refresh test)
+### 2026-05-07 08:57 | gpt-5-codex | RUNNER_RESULT
+Goal-id: auth-hardening-20260507
+Task: review race-safety and tests
+Status: complete
+Summary: Review found no remaining TOCTOU race after SELECT FOR UPDATE.
+Telemetry: tasks complete 2/2; raw logs loaded into orchestrator: none
+Raw logs: .agent-work-mux/runs/auth-hardening-20260507/review/
+Goal ledger: AIMemory/goals/INDEX.md row updated
 
-### 2026-04-26 16:42 | claude-opus-4-5 | HANDOFF_CLOSED
-← gpt-5-codex: handoff_auth-review.gpt-5-codex.md
-Completed: TOCTOU race fixed via DB-level locking; concurrent-refresh
-test added (passes 1000/1000 trials). Ready to merge.
+### 2026-05-07 09:00 | gpt-5-codex | GOAL_COMPLETED
+Goal-id: auth-hardening-20260507
+State: complete
+Final report: AIMemory/goals/auth-hardening-20260507.md
+Active cursor: AIMemory/goals/ACTIVE.md points to completed goal; final report written true
+Goal ledger: AIMemory/goals/INDEX.md row updated
 
-### 2026-04-26 16:43 | claude-opus-4-5 | NOTE
-Lesson: rotation logic must be inside a serializable transaction OR use
-SELECT...FOR UPDATE. Future agents touching auth/refresh.ts: don't undo
-this without re-checking concurrent-refresh test.
+### 2026-05-07 09:10 | gpt-5-codex | UNINSTALLED
+Files removed: CLAUDE.md sentinel block, .codex/instructions.md sentinel block
+Files preserved: AIMemory/ preserved; .agent-work-mux/ preserved by user choice
+Sentinel hashes removed: sha256:examplehash, sha256:examplehash2
+Reason: user request
+
+### 2026-05-07 09:20 | gpt-5-codex | RE_INSTALLED
+Previous installer version: sha256:oldprompt
+New installer version: sha256:newprompt
+Schema delta summary: Reused existing AIMemory and refreshed managed sentinels.
+AIMemory state: reused

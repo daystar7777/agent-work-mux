@@ -1,483 +1,459 @@
-# agent-work-mem
+# AgentWorkMux
 
 [Korean README](README.ko.md)
 
-> A vendor-neutral, file-based collaboration protocol that lets multiple AI coding agents — Claude Code, ChatGPT Codex CLI, OpenCode, Antigravity, Cursor, Aider, Cline, Continue, Windsurf, gemini-cli — share state, hand off work, and resume across sessions, models, and machines. Nothing but markdown in your project.
+> Markdown memory and work routing for AI coding agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: stable](https://img.shields.io/badge/Status-stable-green.svg)]()
-[![Version: v2](https://img.shields.io/badge/Version-v2--tiered-blue.svg)]()
+[![Version: v3](https://img.shields.io/badge/Version-v3--orchestration-blue.svg)]()
+
+AgentWorkMux lets Claude Code, ChatGPT Codex CLI, OpenCode, Antigravity, Cursor,
+Aider, Cline, Continue, Windsurf, gemini-cli, and other file-capable agents
+share project memory, route work, run explicit goals, and resume across sessions.
+
+It is markdown-first. The durable state lives in `AIMemory/`; the main command
+surface is `/awm`.
 
 ---
 
-## Quick start
+## Quick Start
 
-Using several AI coding agents is powerful, but the context handoff is painful: copy-pasting summaries, repeating decisions, losing track of who ran what.
-
-`agent-work-mem` gives your project one shared working memory. Any agent can read it, write to it, and hand work off to another agent.
-
-### Language policy
-
-All operational prompt surfaces installed by `agent-work-mem` are English-only: `prompt.md`, `PROTOCOL.md`, `upgrade.md`, and generated protocol templates. Localized README files are human documentation only and are not copied into `AIMemory/` or loaded as protocol prompts. User-provided text in logs and handoffs is preserved verbatim.
-
-### Install in one prompt
+### Install
 
 Open any agent in your project directory and say:
 
 ```text
-Fetch https://raw.githubusercontent.com/daystar7777/agent-work-mem/main/prompt.md and apply it to this project.
+Fetch https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/prompt.md and apply it to this project.
 ```
 
-Or, in plain language:
+Or:
 
 ```text
-Install daystar7777/agent-work-mem into this project.
+Install daystar7777/agent-work-mux into this project.
 ```
 
-The agent will create an `AIMemory/` folder and set up the shared memory protocol.
+The agent creates `AIMemory/` and installs the AgentWorkMux protocol.
 
-### Start another agent
+### Run A Goal
 
-After installation, open any other agent and say:
+For goal-level orchestration, use `/awm goal`:
+
+```text
+/awm goal "Ship the auth hardening slice. Claude implements, Codex reviews, and the current agent writes the final report."
+```
+
+`/awm goal` accepts natural language as a goal request. Quotes are optional
+unless the request starts with a reserved goal subcommand such as `list` or
+`status`. It creates a goal record, resolves project agent aliases, defaults to
+auto-run after parsing/planning, and stores compact results/errors under
+`AIMemory/goals/`.
+
+Headless execution requires an explicit `/awm` command. Plain natural language
+can still ask for planning or manual handoff, but it must not start headless
+workers.
+
+### Resume Later
+
+In a new session, say:
 
 ```text
 Read the project structure and AIMemory, then tell me you understand the current state.
 ```
 
-That agent will read `AIMemory/INDEX.md`, `AIMemory/PROJECT_OVERVIEW.md`, and `AIMemory/work.log` before working.
-
-### Hand off work
-
-Ask the sending agent:
-
-```text
-Hand this off to Codex for implementation.
-```
-
-Then ask the receiving agent:
-
-```text
-Review the handoff and execute it.
-```
-
-All prompts, decisions, actions, tests, and handoffs are recorded in plain markdown, especially `AIMemory/work.log`.
-
-Works with Claude, Codex, Cursor, Antigravity, Aider, Cline, Continue, Windsurf, gemini-cli, and any agent that can read and write files.
+The agent reads `AIMemory/INDEX.md`, `AIMemory/PROJECT_OVERVIEW.md`, and recent
+`work.log` state before acting.
 
 ---
 
-## What is this?
+## Language Policy
 
-If you've ever felt any of these:
+Operational prompt surfaces are English-only: `prompt.md`, `PROTOCOL.md`,
+`upgrade.md`, `uninstall.md`, `migration.md`, `runner.md`, and generated
+protocol templates.
 
-- An AI agent forgets what it did 30 minutes ago after `/compact`.
-- You hand work between Claude and GPT and they trample each other's edits.
-- A new session has no idea what the previous session decided.
-- "Did the agent run the tests, or just say it did?" — no audit trail.
-- After a few days the AIMemory folder is so big that just reading it bloats LLM context.
-- A new LLM joining the project has no quick way to understand what's going on.
-
-**agent-work-mem** is a 1-prompt install that fixes all of this. It establishes a small protocol — a few markdown files in your project — that every AI agent reads at session start and writes to as it works. Result: persistent shared memory across any combination of agents, vendors, and machines, with **tiered storage** so old context doesn't bloat new sessions.
-
-It's just markdown. No daemon, no database, no SaaS. Your existing AI agent does all the work — you just point it at this repo and say "apply".
+Localized README files are human documentation only. User-provided text in
+logs, goals, and handoffs is preserved verbatim.
 
 ---
 
-## How it works
+## What This Solves
 
-A few files in your project's `AIMemory/` folder:
+AgentWorkMux helps when:
 
-```
+- an agent forgets after `/compact`, a model swap, or a reboot
+- several agents need the same project state without copy-paste summaries
+- you want one agent to orchestrate a goal while other workers implement or test
+- you need an audit trail of prompts, actions, files changed, tests, and results
+- old context should stay searchable without bloating every new session
+- you want uninstall/reinstall to preserve project memory
+
+The core is still just markdown. The optional CLI runner is lazy-loaded only for
+explicit `/awm` commands.
+
+---
+
+## Core Files
+
+```text
 your-project/
-├── (your code)
-└── AIMemory/
-    ├── INDEX.md            ← file inventory + topic search index (read FIRST)
-    ├── PROJECT_OVERVIEW.md ← onboarding primer for any new LLM (read SECOND)
-    ├── PROTOCOL.md         ← the rules (every agent reads this once on bootstrap)
-    ├── work.log            ← append-only HOT event log (last ~50 events)
-    ├── archive/            ← WARM tier — older events grouped by date
-    │   └── work-YYYY-MM-DD.log
-    ├── cold/               ← COLD tier — period digests (on-demand)
-    │   └── digest-YYYY-MM.md
-    ├── handoff_*.md        ← cross-agent messages (AICP)
-    └── *.md                ← any other agent-authored notes
+  AIMemory/
+    INDEX.md              file inventory and topic index
+    PROJECT_OVERVIEW.md   onboarding primer for new sessions
+    PROTOCOL.md           installed AgentWorkMux rules
+    INSTALLATION.md       install/reinstall/uninstall metadata
+    AGENTS.md             project-scoped aliases and routing policy
+    work.log              append-only hot event log
+    goals/                /awm goal cursor, records, and compact results
+      ACTIVE.md           current goal pointer and resume cursor
+      INDEX.md            goal history ledger and status dashboard
+    archive/              warm rotated logs
+    cold/                 long-period digests
+    handoff_*.md          manual AICP messages
 ```
 
-Every agent, on every turn, follows a fixed reading order:
+Private runner state is ignored by git:
+
+```text
+.agent-work-mux/
+  agents.local.md
+  runs/<goal-id>/
+  tmp/
+```
+
+`AIMemory/`, `.codex/`, `.claude/`, `.opencode/`, `.agent-work-mux/`, and the
+legacy `.agent-work-mem/` directory should not be committed.
+
+---
+
+## How AgentWorkMux Works
+
+Normal session flow:
 
 ```mermaid
 flowchart LR
-    A[New user message] --> B[Read INDEX.md]
-    B --> C[Read PROJECT_OVERVIEW.md]
-    C --> D[Read work.log tail]
-    D --> E{Need older<br/>context?}
-    E -->|grep INDEX topic index| F[Load specific archive]
-    E -->|no| G[Proceed with work]
-    F --> G
-    G --> H[Append events<br/>to work.log]
-    H --> I{work.log<br/>over threshold?}
-    I -->|yes| J[Rotate oldest events<br/>to archive/, update INDEX]
-    I -->|no| K[Reply to user]
-    J --> K
+    A["New user message"] --> B["Read AIMemory/INDEX.md"]
+    B --> C["Read PROJECT_OVERVIEW.md"]
+    C --> D["Read recent work.log"]
+    D --> E{"Explicit /awm?"}
+    E -->|yes| F["Parse command / goal"]
+    E -->|no| G["Normal planning or manual collaboration"]
+    F --> H["Update goal / route workers"]
+    G --> I["Do work"]
+    H --> J["Record compact results"]
+    I --> J
+    J --> K["Append work.log event"]
 ```
 
-When agents need to coordinate, they write **AICP handoff files**:
+Goal orchestration flow:
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant A as Claude Code
-    participant L as work.log
-    participant H as handoff file
-    participant B as Codex CLI
+    participant O as Orchestrator
+    participant G as AIMemory/goals
+    participant R as Lazy CLI runner
+    participant W as Worker agent
 
-    U->>A: "implement auth, then hand off to gpt-5-codex"
-    A->>L: PROMPT, WORK_START
-    A->>A: writes code
-    A->>H: handoff_auth.claude-opus-4-5.md<br/>(REVIEW_REQUEST → gpt-5-codex)
-    A->>L: HANDOFF event
-    A->>L: WORK_END
-
-    Note over U,B: --- new session, different agent ---
-
-    U->>B: "pick up the handoff that claude-opus-4-5 sent"
-    B->>L: read tail (sees HANDOFF)
-    B->>H: read review request
-    B->>H: handoff_auth.gpt-5-codex.md<br/>(REVIEW_RESPONSE)
-    B->>L: HANDOFF_RECEIVED + new HANDOFF
-    B->>U: review summary
+    U->>O: /awm goal "Ship feature. Claude implements, Codex reviews."
+    O->>G: create goal contract + ACTIVE.md cursor
+    O->>O: resolve aliases from AGENTS.md
+    O->>R: lazy-load runner only now
+    R->>W: dispatch worker task
+    W-->>R: raw output
+    R-->>O: compact result only
+    O->>G: update telemetry, state gate, result/error
+    O->>G: pass completion guard, write final report
+    O->>U: concise completion report
 ```
 
-Each event in `work.log` carries the agent's identity and capabilities (vendor-neutral tags):
-
-```
-### 2026-04-26 14:30 | claude-opus-4-5 | PROJECT_BOOTSTRAPPED
-Vendor: Anthropic
-Harness: Claude Code
-Capabilities: filesystem-read, filesystem-write, shell-exec, web-fetch, web-search
-Strengths: long-context reasoning + code synthesis
-Context: 200000
-
-### 2026-04-26 15:11 | gpt-5-codex | HANDOFF_RECEIVED
-← claude-opus-4-5: handoff_auth.claude-opus-4-5.md
-Acknowledged. Replying in handoff_auth.gpt-5-codex.md.
-```
-
-Any agent can read another agent's record and know what it could do — no vendor-specific tool names like `Bash` or `WriteFile`, just generic capabilities like `filesystem-write`, `shell-exec`, `web-search`.
+Manual AICP handoff files still exist, but they are now the fallback/lower-level
+message protocol. The primary user-facing workflow is `/awm goal`.
 
 ---
 
-## Installation
+## `/awm` Commands
 
-### Option A — One-line URL install (recommended, easiest)
-
-In your project directory, open any agentic LLM (Claude Code, ChatGPT Codex CLI, OpenCode, Antigravity, Cursor, Aider, etc.) and tell it:
-
-> Fetch <https://raw.githubusercontent.com/daystar7777/agent-work-mem/main/prompt.md> and apply it to this project.
-
-The agent will WebFetch the prompt and execute the bootstrap steps automatically. Done in one minute.
-
-### Option B — Paste the prompt manually
-
-If your agent doesn't have web fetch, copy the contents of [`prompt.md`](prompt.md) and paste it into your first session. Same result; one extra step.
-
-### Option C — Existing user upgrading from v1 (flat layout)
-
-If you already used an earlier version of agent-work-mem (just `PROTOCOL.md` + `work.log`, no `INDEX.md` / `PROJECT_OVERVIEW.md` / `archive/` / `cold/`), tell your agent:
-
-> Fetch <https://raw.githubusercontent.com/daystar7777/agent-work-mem/main/upgrade.md> and execute it on this project.
-
-The upgrade is non-destructive — your existing `work.log` is preserved. The agent adds the missing files, synthesizes `PROJECT_OVERVIEW.md` from your existing log, and rotates if needed.
-
-### What the bootstrap does
-
-1. The agent declares its identity (model-id, vendor, harness, capabilities)
-2. Detects your OS (for the optional Obsidian step)
-3. Creates the `AIMemory/` directory tree (`archive/`, `cold/`)
-4. Writes `PROTOCOL.md`, `work.log`, `INDEX.md`, `PROJECT_OVERVIEW.md`
-5. Appends a `PROJECT_BOOTSTRAPPED` event with its capabilities
-6. Optionally detects/installs Obsidian (with your consent) for visual log browsing
-7. Commits to following the protocol on every later turn
-
-| Compatible agent platform | Underlying model(s)                  |
-|---------------------------|--------------------------------------|
-| Claude Code               | Claude Opus / Sonnet / Haiku         |
-| ChatGPT Codex (CLI)       | GPT-5 / GPT-5-Codex                  |
-| OpenCode                  | any (via provider config)            |
-| Antigravity               | Gemini family                        |
-| Cursor (agent mode)       | Claude / GPT / Gemini                |
-| Aider                     | any (via provider config)            |
-| Cline / Continue          | any (via provider config)            |
-| Windsurf                  | proprietary + others                 |
-| Codex CLI / gemini-cli    | GPT-5-Codex / Gemini-2.5-Pro         |
-
-### Persistent reminder for later sessions
-
-For every new session in this project, the agent should auto-read the protocol. The cleanest way is to put this short reminder in the agent's permanent system prompt:
-
-```
-This project uses the AIMemory protocol. Read AIMemory/INDEX.md,
-AIMemory/PROJECT_OVERVIEW.md, and the last 50 lines of AIMemory/work.log
-before processing my request. State your model-id and capabilities, then
-proceed.
+```text
+/awm setup
+/awm agents
+/awm agents test [--all | <agent-selector>] [--smoke]
+/awm agents hints [agent-selector]
+/awm goal <goal request> [--policy <policy>] [--with <agents>]
+/awm goal list [--state <state>] [--limit <n>]
+/awm goal history [goal-id] [--limit <n>]
+/awm goal status [goal-id]
+/awm goal pause <goal-id>
+/awm goal resume <goal-id>
+/awm goal stop <goal-id>
+/awm goal clear [--completed | --stopped | --all]
+/awm run <task> [agent-selector]
+/awm handoff <target-agent> <task>
+/awm uninstall
 ```
 
-Where to put it:
+Important rules:
 
-- **Claude Code**: append to `CLAUDE.md` at project root
-- **Cursor**: add to `.cursorrules`
-- **Aider**: add to `.aider.conf.yml` `read:` list
-- **ChatGPT Codex CLI**: `.codex/instructions.md`
-- **Custom GPT** / Claude Project: paste into the system instructions
+- `list`, `history`, `status`, `pause`, `resume`, `stop`, and `clear` are
+  reserved `/awm goal` subcommands.
+- New goal requests may be unquoted when the first word is not reserved:
+  `/awm goal Ship the auth slice`. Use quotes when the request starts with a
+  reserved word: `/awm goal "list flaky tests and fix them"`.
+- Quotes are also the safest form when the request text itself contains
+  option-like tokens such as `--policy`.
+- `/awm goal` defaults to auto-run after parsing/planning.
+- `/awm setup` refreshes lifecycle metadata, aliases, and runner pointers; it
+  does not dispatch workers.
+- Headless dispatch requires `/awm`; plain natural language is never enough.
+- Goal records store state, compact results, and errors, not full transcripts.
+- `AIMemory/goals/ACTIVE.md` points to the current goal and resume checkpoint.
+- `AIMemory/goals/INDEX.md` lists current and previous goals, status, dates,
+  token/cost telemetry when available, and final report links.
+- The orchestrator updates lightweight telemetry so long-running work can
+  resume without loading raw worker transcripts.
+- The orchestrator writes one integrated final report when the goal completes.
 
-After that, every new session auto-reads the protocol — you don't paste anything.
+Goal states:
+
+```text
+active
+awaiting_user
+paused
+error_paused
+stopped
+complete
+```
+
+Legacy aliases:
+
+```text
+/awm goals            -> /awm goal list
+/awm status --all     -> /awm goal list
+/awm status <goal-id> -> /awm goal status <goal-id>
+/awm pause <goal-id>  -> /awm goal pause <goal-id>
+/awm resume <goal-id> -> /awm goal resume <goal-id>
+```
 
 ---
 
-## Usage
+## Goal Mechanics
 
-### Multi-agent handoff — the natural phrasings
+`/awm goal` borrows the useful shape of Codex-style goal tracking, but keeps the
+state in markdown so any agent can resume it.
 
-The handoff system is the most powerful feature. The phrasings that work in practice:
+- **Active goal cursor**: `AIMemory/goals/ACTIVE.md` names the current goal,
+  state, last completed task, next checkpoint, and final-report status.
+- **Goal history ledger**: `AIMemory/goals/INDEX.md` is lazy-read for
+  `/awm goal list`, `/awm status --all`, or user questions about previous goals.
+  It shows objective, state, created/updated/completed times, orchestrator,
+  token/cost telemetry, final report path, and goal record path.
+- **Goal contract**: each `AIMemory/goals/<goal-id>.md` stores objective,
+  parsed tasks, worker assignments, policy, results, errors, telemetry, and
+  completion guard status.
+- **State gate**: runner dispatch is allowed only while state is `active`.
+  `awaiting_user`, `paused`, and `error_paused` stop auto-run immediately.
+- **Budget/telemetry loop**: compact counters and checkpoints are updated after
+  each worker result; raw logs stay in `.agent-work-mux/runs/`.
+- **Completion guard**: a goal cannot become `complete` until every task is
+  resolved, errors are either fixed or documented, tests/verification are
+  recorded, and the final report is written.
 
-**To the sending agent:**
+This makes goal work resumable after context loss without turning the active
+orchestrator into a transcript sink.
 
-> "When you finish, hand this off to `gpt-5-codex` for review."
-> "Prepare a handoff for `gpt-5-codex` so it can continue from here."
+`/awm goal list` reads the ledger and prints a compact dashboard. If a final
+report exists, it should show the report path. If token usage is unavailable
+from a worker, record `unknown`; if it is estimated, mark it as `estimated`.
 
-The agent will create `AIMemory/handoff_<topic>.<your-model>.md` with a structured AICP header and log a `HANDOFF` event in `work.log`.
-
-**To the receiving agent (in a separate session):**
-
-> "Pick up the handoff that `claude-opus-4-5` sent and review it."
-> "Review the latest open handoff and continue the work."
-
-The receiving agent reads `work.log`, finds the open HANDOFF event, opens the handoff file, and writes a `REVIEW_RESPONSE` reply with action items.
-
-**This is the actual usage pattern.** You don't need to know AICP message types or write the handoff file by hand — natural-language instructions trigger the structured machinery underneath.
-
-See [`examples/handoff_auth-review.claude-opus-4-5.sample.md`](examples/handoff_auth-review.claude-opus-4-5.sample.md) and the matching response for full sample files.
-
-### Recovering from session loss (`/compact`, model swap, machine reboot)
-
-1. Open a new session in the project.
-2. Paste the short reminder (or rely on your system-prompt setup).
-3. Agent reads `INDEX.md` → `PROJECT_OVERVIEW.md` → `work.log` tail → knows exactly where you left off.
-4. Agent checks for orphan `WORK_START` (work that started but didn't `WORK_END`).
-5. If found, agent asks: "Previous task '<X>' didn't finish. Resume, or start fresh?"
-
-Average resume time: **under 60 seconds**, regardless of how long ago you stopped.
-
-### Searching old work
-
-Need to find when something happened? Don't read every archive file — `grep` the topic index in `INDEX.md`:
-
-```bash
-grep -i "auth" AIMemory/INDEX.md
-# → archive/work-2026-04-26.log appears in the topic index
-# load only that file; skip the rest.
-```
-
-The agent does this automatically when you ask "did we discuss X before?" — it greps INDEX, identifies the relevant warm/cold files, and loads only those.
-
-### Keeping context small (the tiering system)
-
-When `work.log` exceeds the threshold (default 50 events × 1.5 = 75 events), the next agent that starts a turn rotates the oldest events to `AIMemory/archive/work-YYYY-MM-DD.log` and updates `INDEX.md` with the new archive's date range, event count, and topic keywords.
-
-The user-tunable knob is the first line of `INDEX.md`:
-
-```markdown
-## Configuration
-- HOT_RETENTION_EVENTS: 50    # change this to 30 / 100 / etc.
-```
-
-| Project type                       | Recommended |
-|------------------------------------|-------------|
-| Active multi-agent (≥3 agents/day) | 30          |
-| Standard (default)                 | 50          |
-| Long-running solo                  | 100         |
-
-Cold digests (multi-week summaries in `cold/`) are heavyweight — they only happen on explicit user request: "summarize last month into a cold digest". After a cold digest is written, the agent updates `PROJECT_OVERVIEW.md` so the project's onboarding primer always reflects the latest decisions.
-
-### Multi-machine work (cloud-synced AIMemory)
-
-If `AIMemory/` lives on Dropbox / iCloud / Google Drive, switch to **per-session log files** to avoid sync conflicts:
-
-```
-AIMemory/
-├── PROTOCOL.md
-├── INDEX.md
-├── PROJECT_OVERVIEW.md
-├── work.log              (legacy / digest)
-└── sessions/
-    ├── 2026-04-26T14-30__claude-opus-4-5__claude-code.log
-    ├── 2026-04-26T14-32__gpt-5-codex__chatgpt-codex-cli.log
-    └── 2026-04-26T15-10__gemini-2-5-pro__antigravity.log
-```
-
-Each session writes to its own file. The protocol detects this mode automatically.
-
-### Optional: Obsidian for visual browsing
-
-The bootstrap prompt offers to install [Obsidian](https://obsidian.md) and instructs you to open `AIMemory/` as a vault. Recommended community plugins:
-
-- **Dataview** — query `work.log` events as a table (e.g. "all open WORK_STARTs")
-- **Templater** — pre-fill new handoff files with the AICP header
-- **Calendar** — daily activity view
-
-Sample Dataview query for a dashboard note:
-
-````markdown
-```dataview
-TABLE WITHOUT ID From, To, Type, Priority, file.link AS "Handoff"
-FROM ""
-WHERE startswith(file.name, "handoff_")
-  AND !contains(file.content, "HANDOFF_CLOSED")
-SORT file.mtime DESC
-```
-````
-
-→ All open handoffs in one table, automatically.
+`/awm goal stop <goal-id>` is a terminal user stop, distinct from `paused`.
+`/awm goal clear` only clears the active cursor or folds ledger rows by default;
+it must not delete goal records unless the user gives an explicit destructive
+confirmation.
 
 ---
 
-## Cautions
+## Agent Selectors And Aliases
 
-- **Append-only — never edit `work.log` mid-stream.** The protocol uses POSIX `O_APPEND` atomicity for race safety; read-modify-write tools break this guarantee. The one exception is rotation, which atomically replaces `work.log` (write to temp file + rename).
-- **Keep events under 4 KB.** POSIX guarantees atomic appends only at this size. If your event body is longer, split: write the bulk into a separate `AIMemory/<slug>.<model-id>.md` file and put a short event in `work.log` linking to it.
-- **Cloud-synced AIMemory needs per-session files.** Sync layers (Dropbox, iCloud, Google Drive, OneDrive) will produce conflict copies if multiple machines write to the same `work.log`. Use the per-session mode above.
-- **Some agents don't reliably know their own model version.** They should ask the user instead of guessing. Wrong model-id pollutes the log permanently.
-- **`AIMemory/` may contain sensitive info.** Conversations, design notes, internal decisions. If your repo is public, either: keep `AIMemory/` in a private repo, or audit before commit, or gitignore `AIMemory/` and back it up separately.
-- **Don't put secrets in `work.log`.** API keys, tokens, passwords — never. Use env vars + reference them by name only.
-- **The protocol is a convention, not enforcement.** A misbehaving agent can still skip the rules. The remedy is a one-line nudge ("you forgot to append WORK_END") — same as code review.
+Agent references use:
+
+```text
+<agent>[:<model-or-tier>[:<profile>]]
+```
+
+Examples:
+
+```text
+claude
+claude:opus-4.7:max
+gemini:pro
+codex:gpt-5-codex
+deepseek:coder:local
+```
+
+If only an agent name is provided, the orchestrator chooses a model/profile by
+task difficulty and records the choice in the goal record.
+
+Aliases are project-scoped and live in `AIMemory/AGENTS.md`, for example:
+
+```text
+claude-max -> claude:opus-4.7:max
+deepseek-pro-max -> deepseek:coder:max
+```
+
+Keep secrets, credentials, auth tokens, private executable paths, and local
+account names out of `AIMemory/AGENTS.md`. Put private overrides under ignored
+`.agent-work-mux/` files or environment variables.
 
 ---
 
-## Benefits
+## Agent Call Probes
 
-| Benefit | Why it matters |
-|---------|----------------|
-| **Cross-vendor** | Works with Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Qwen, Meta — generic capability vocabulary, no vendor lock-in. |
-| **Cross-harness** | Same project: Claude Code today, Cursor tomorrow, Codex CLI on the laptop. All share state. |
-| **Cross-session** | Survives `/compact`, model swaps, crashed sessions, reboots. New session reads `INDEX.md` + `PROJECT_OVERVIEW.md` + tail and is current in 60 seconds. |
-| **Cross-machine** | Per-session file mode handles Dropbox/iCloud sync without conflicts. |
-| **Tiered storage** | Old context goes to warm archives + cold digests; hot context stays small. New sessions don't drown in old logs. |
-| **Searchable history** | `grep` the Topic index in `INDEX.md` to find which archive covers a topic. No reading everything. |
-| **Onboarding primer** | `PROJECT_OVERVIEW.md` is the 60-second briefing for any new LLM joining mid-project. |
-| **Race-safe** | POSIX `O_APPEND` atomicity baseline + optional `flock` + per-session fallback. Tiered defense, no silent corruption. |
-| **Auditable** | Every action is logged. "Did the agent run the tests?" — grep `work.log`. |
-| **Markdown-native** | Works with Obsidian, any text editor, git, grep. No special tooling required. |
-| **Zero install** | One-line URL install (`Fetch <url> and apply`) with any web-capable agent. |
-| **Capability-aware handoffs** | Receiving agent sees `Required capability` in handoff header and can refuse with `BLOCKER_RAISED` instead of failing silently. |
+After installation, run a small probe before relying on headless workers:
+
+```text
+/awm agents test --all --smoke
+```
+
+This lazy-loads `agent-call-probe.md`, calls each configured worker with a tiny
+prompt, records raw logs under ignored `.agent-work-mux/probes/`, and writes
+compact hints to `AIMemory/AGENTS.md`.
+
+Hints capture the working invocation, CLI version, headless status, telemetry
+shape, known warnings, and corrected commands after failures. Re-run the probe
+when an agent version changes. Use `/awm agents hints` to read the current
+hints without calling any agent.
+
+---
+
+## Lazy CLI Runner
+
+The preferred v3 runner shape is a local CLI runner. MCP is deferred.
+
+Runner rules:
+
+- runner instructions are lazy-loaded from `runner.md` or `AIMemory/RUNNER.md`
+  only after an explicit `/awm` command
+- raw worker output goes under ignored `.agent-work-mux/runs/<goal-id>/`
+- the main orchestrator reads compact summaries/errors/results by default
+- raw logs are loaded only for explicit debugging
+
+This follows RTK-style token isolation: worker output must not flood the main
+agent context.
+
+---
+
+## Lazy Legacy Migration
+
+`agent-work-mem` is deprecated. If the installer detects an existing
+`agent-work-mem` installation, it should not perform a second bootstrap or
+duplicate memory. Instead, it lazy-loads `migration.md` and converts only the
+installation identity.
+
+Migration preserves `AIMemory/`, work history, handoffs, archives, cold digests,
+and goal records. It replaces safely bounded legacy reminder blocks, appends one
+`RE_INSTALLED` lifecycle event, and creates missing v3 files such as
+`AIMemory/goals/ACTIVE.md`.
+
+The legacy `.agent-work-mem/` local state directory is removed only after
+explicit user opt-in.
+
+---
+
+## Install, Upgrade, Uninstall
+
+Fresh install:
+
+```text
+Fetch https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/prompt.md and apply it to this project.
+```
+
+Upgrade an older `AIMemory/` installation:
+
+```text
+Fetch https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/upgrade.md and execute it on this project.
+```
+
+Migrate a deprecated `agent-work-mem` installation only when detected:
+
+```text
+Fetch https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/migration.md and execute it on this project.
+```
+
+Uninstall/detach while preserving `AIMemory/`:
+
+```text
+Fetch https://raw.githubusercontent.com/daystar7777/agent-work-mux/main/uninstall.md and execute it on this project.
+```
+
+Uninstall removes only managed sentinel blocks whose hash still matches. It
+preserves `AIMemory/` and removes `.agent-work-mux/` only after explicit user
+opt-in. Reinstall reuses existing `AIMemory/` and appends `RE_INSTALLED`.
+
+---
+
+## Manual Handoffs
+
+Manual handoffs remain available through AICP when you do not want headless
+dispatch:
+
+```text
+Prepare a handoff for gpt-5-codex so it can review this.
+```
+
+The agent creates `AIMemory/handoff_<topic>.<model>.md` and logs a `HANDOFF`
+event. A receiving agent can later read that file and reply with
+`REVIEW_RESPONSE`, `STATUS_REPORT`, or another AICP message.
+
+Use manual handoffs for low-risk asynchronous coordination. Use `/awm goal` for
+goal-level orchestration and worker routing.
+
+---
+
+## Safety Notes
+
+- Do not commit `AIMemory/`, `.agent-work-mux/`, `.agent-work-mem/`, `.codex/`,
+  `.claude/`, or `.opencode/`.
+- Do not put secrets in `INSTALLATION.md`, `AGENTS.md`, `work.log`, goals, or
+  handoffs.
+- Use environment variables or ignored local overrides for private runner data.
+- Plain natural language must not start headless worker dispatch.
+- If an agent is unsure, it appends a `NOTE` instead of guessing silently.
 
 ---
 
 ## Examples
 
-### Real scenarios
-
-**Scenario 1 — Claude writes, GPT reviews (handoff in 2 sentences)**
-
-User to Claude Code: "Implement JWT auth. Then hand off to `gpt-5-codex` for review."
-- Claude writes the auth code, creates `handoff_auth.claude-opus-4-5.md` (REVIEW_REQUEST), logs HANDOFF.
-
-User opens Codex CLI: "Pick up the handoff that `claude-opus-4-5` sent."
-- Codex reads `work.log` tail, finds HANDOFF, opens the file, writes `handoff_auth.gpt-5-codex.md` (REVIEW_RESPONSE).
-
-Claude session resumes the next day: it sees the review immediately via `INDEX.md`'s "Active handoffs" section.
-
-**Scenario 2 — `/compact` recovery**
-
-1. New Claude session.
-2. Reads `INDEX.md` (small, free) → sees what archives exist + active handoffs.
-3. Reads `PROJECT_OVERVIEW.md` → instant project context.
-4. Reads `work.log` tail → recent events.
-5. Last `RE_ENGAGED` shows previous session had `web-search` capability — current session doesn't. Either uses cached info or hands off.
-6. Orphan `WORK_START`? → ask user about resumption.
-
-**Scenario 3 — Searching old work**
-
-User: "What did we decide about refresh tokens last month?"
-- Agent runs `grep -i "refresh" AIMemory/INDEX.md`.
-- Topic index points to `archive/work-2026-04-26.log`.
-- Agent loads that one file (not the whole archive directory).
-- Replies with the decision context, and possibly the source events.
-
-**Scenario 4 — Onboarding a new LLM mid-project**
-
-User adds Gemini (Antigravity) to the project for the first time.
-- User: "Read the AIMemory and tell me you understand the project."
-- Gemini reads `INDEX.md` → `PROJECT_OVERVIEW.md` (project briefing) → `work.log` tail.
-- Gemini summarizes back what it learned in 30 seconds.
-- Now Gemini is fully oriented and can take handoffs from Claude/GPT.
-
-**Scenario 5 — Capability mismatch caught early**
-
-1. Gemini analyzes a PDF (multimodal capability) → STATUS_REPORT with `Required capability: image-input`.
-2. Claude sees the handoff but lacks `image-input`. Reads the text summary instead of attempting the PDF directly. Logs `Capability used: text-only`.
-3. Future session knows: "if I need to re-analyze the PDF, route to Gemini."
-
-**Scenario 6 — Two agents, same machine, concurrent**
-
-1. User has Claude Code + Codex CLI open in two terminals.
-2. Both follow PROTOCOL.md §6.1 (single heredoc, ≤4KB events) → POSIX `O_APPEND` atomicity prevents byte interleaving.
-3. Each agent reads tail before write — if the other has an open `WORK_START`, append a `NOTE` flagging concurrent work.
-4. After the dust settles, `work.log` interleaves their events in real time order. Markers make it human-readable.
-
-**Scenario 7 — Multi-machine via Dropbox**
-
-1. Desktop Claude Code session → writes to `AIMemory/sessions/2026-04-26T14-30__claude-opus-4-5__claude-code.log`.
-2. Laptop Cursor session → writes to `AIMemory/sessions/2026-04-26T14-32__claude-opus-4-5__cursor.log`.
-3. Each owns its own file → zero sync conflict.
-
-See [`examples/`](examples/) for full file samples.
-
----
-
-## Architecture in one screen
-
+```text
+/awm goal "Ship the v3 lifecycle docs. Claude drafts, Codex reviews."
+/awm goal list --limit 10
+/awm goal history auth-hardening-20260507
+/awm goal status auth-hardening-20260507
+/awm goal pause auth-hardening-20260507
+/awm goal resume auth-hardening-20260507
+/awm goal stop auth-hardening-20260507
+/awm goal clear --completed
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    your-project/                         │
-│                                                          │
-│  src/                          AIMemory/                 │
-│  ├── ...                       ├── INDEX.md (read 1st)   │
-│  └── ...                       ├── PROJECT_OVERVIEW.md   │
-│                                ├── PROTOCOL.md           │
-│                                ├── work.log     (HOT)    │
-│                                ├── archive/     (WARM)   │
-│                                ├── cold/        (COLD)   │
-│                                └── handoff_*.md          │
-└──────────────────────────────────────────────────────────┘
-              ▲                          ▲
-              │                          │
-   ┌──────────┴──────────┐    ┌──────────┴──────────┐
-   │    Claude Code      │    │   ChatGPT Codex CLI │
-   │  claude-opus-4-5    │    │     gpt-5-codex     │
-   │ filesystem-write,   │    │ filesystem-write,   │
-   │ shell-exec, ...     │    │ shell-exec, ...     │
-   └─────────────────────┘    └─────────────────────┘
-              ▲                          ▲
-              │                          │
-              └──────── User ────────────┘
-                  (any agent works,
-                   any time, any machine)
-```
+
+See [`examples/`](examples/) for sample `INDEX.md`, `ACTIVE.md`, goal ledger,
+`INSTALLATION.md`, `AGENTS.md`, goal records, and manual handoff files.
 
 ---
 
 ## License
 
-MIT — do whatever, attribution appreciated.
+MIT. Attribution appreciated.
+
+---
 
 ## Contributing
 
-Issues + PRs welcome. The protocol is intentionally minimal; if you propose an addition, please show:
+Contributions are welcome. Keep the project markdown-first, keep operational
+prompts English-only, and keep `/awm goal` as the primary user-facing workflow.
 
-1. The concrete pain point that motivates it.
-2. Why it can't be solved with an existing event type or convention.
-3. Backward compatibility — older `work.log` files must still parse.
+---
 
 ## Credits
 
-Distilled from real multi-AI shipping projects (Anthropic + OpenAI + Google agents collaborating on the same codebase). The protocol is the deliverable.
+Built from real multi-agent coding workflows where Claude, Codex, Gemini, and
+other agents need shared memory, explicit routing, and a clean way to finish
+work without drowning the next session in context.

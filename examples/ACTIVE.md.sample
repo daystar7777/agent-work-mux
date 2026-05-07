@@ -1,0 +1,16 @@
+# Active Goal Cursor
+
+**Current goal-id**: auth-hardening-20260507
+**State**: active
+**Orchestrator**: gpt-5-codex @ ChatGPT Codex CLI
+**Goal record**: AIMemory/goals/auth-hardening-20260507.md
+**Goal ledger**: AIMemory/goals/INDEX.md
+**Last completed task**: Implement refresh-token lock fix
+**Next checkpoint**: Review race-safety and tests
+**Raw-log root**: .agent-work-mux/runs/auth-hardening-20260507/
+**Final report written**: false
+
+## Resume note
+
+Review is active. Load the goal record first, then read compact runner result
+files only. Do not load raw logs unless debugging is explicitly required.

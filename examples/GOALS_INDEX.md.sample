@@ -1,0 +1,20 @@
+# Goal History
+
+## Summary
+- Total goals: 3
+- Active: 1
+- Awaiting user: 0
+- Paused: 0
+- Error paused: 1
+- Stopped: 0
+- Complete: 1
+
+## Goals
+| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Tokens | Cost | Final report | Record |
+|---------|-----------|-------|---------|---------|-----------|--------------|--------|--------|------|--------------|--------|
+| auth-hardening-20260507 | Ship the auth hardening slice. | active | 2026-05-07T08:45:00Z | 2026-05-07T08:57:00Z |  | gpt-5-codex @ ChatGPT Codex CLI | implement_then_verify | unknown | unknown | pending | AIMemory/goals/auth-hardening-20260507.md |
+| lifecycle-docs-20260506 | Finalize v3 lifecycle docs. | complete | 2026-05-06T10:10:00Z | 2026-05-06T11:05:00Z | 2026-05-06T11:05:00Z | claude-opus-4-7 @ Claude Code | single_agent | estimated:42k | unknown | AIMemory/goals/lifecycle-docs-20260506.md#final-report | AIMemory/goals/lifecycle-docs-20260506.md |
+| api-contract-20260505 | Review API contract and fix failing checks. | error_paused | 2026-05-05T15:20:00Z | 2026-05-05T16:02:00Z |  | gpt-5-codex @ ChatGPT Codex CLI | implement_then_verify | reported:18k | unknown | blocked | AIMemory/goals/api-contract-20260505.md |
+
+---
+Last update: 2026-05-07 17:57 by gpt-5-codex
