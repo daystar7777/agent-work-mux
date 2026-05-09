@@ -21,5 +21,10 @@ AIMemory/
 # agent-work-mux v3 runner local state
 .agent-work-mux/
 
+# Local benchmark and generated app outputs
+goal_result*/
+goal_test*/
+node_modules/
+
 # Legacy runner local state from the former project name
 .agent-work-mem/

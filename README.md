@@ -54,10 +54,11 @@ unless the request starts with a reserved goal subcommand such as `list` or
 auto-run after parsing/planning, and stores compact results/errors under
 `AIMemory/goals/`.
 
-New goal orchestration requires the literal `/awm goal` form. Other AWM
-commands can be invoked with either `/awm ...` or clear natural language, such
-as asking to set up AgentWorkMux, list agents, register a worker, test agents,
-show hints, uninstall, run a named non-goal task, or create a manual handoff.
+New goal orchestration requires an explicit goal command form: `/awm goal
+<request>` or `/awm goals <request>`. Other AWM commands can be invoked with
+either `/awm ...` or clear natural language, such as asking to set up
+AgentWorkMux, list agents, register a worker, test agents, show hints,
+uninstall, run a named non-goal task, or create a manual handoff.
 
 ### Resume Later
 
@@ -97,6 +98,15 @@ AgentWorkMux helps when:
 The core is still just markdown. The optional CLI runner is lazy-loaded only for
 explicit `/awm` commands.
 
+Executable runner helpers are not canonical repo source. Their source lives in
+tracked `*.js.md` helper specs that contain generation notes, OS/runtime
+differences, validation rules, and extractable OS-specific code blocks. The
+generated helper should use the OS default shell first: PowerShell plus an
+optional `.cmd` shim on Windows, POSIX `sh` on Unix-like systems, and `bash`,
+Node, or .NET only as an explicit fallback selected by setup/probe.
+Setup/probe/first runner use lazily materializes them into ignored
+`.agent-work-mux/bin/` files for the current OS/runtime.
+
 ---
 
 ## Core Files
@@ -123,6 +133,9 @@ Private runner state is ignored by git:
 ```text
 .agent-work-mux/
   agents.local.md
+  bin/
+  helpers/
+  probes/
   runs/<goal-id>/
   tmp/
 ```
@@ -160,14 +173,18 @@ sequenceDiagram
     participant G as AIMemory/goals
     participant R as Lazy CLI runner
     participant W as Worker agent
+    participant V as Verifier agent
 
     U->>O: /awm goal "Ship feature. Claude implements, Codex reviews."
     O->>G: create goal contract + ACTIVE.md cursor
+    O->>G: write quality contract + verifier rubric
     O->>O: resolve aliases from AGENTS.md
     O->>R: lazy-load runner only now
     R->>W: dispatch worker task
-    W-->>R: raw output
-    R-->>O: compact result only
+    W-->>R: raw output + result.json
+    R->>V: verifier reads artifact + raw worker logs
+    V-->>R: compact verdict.json
+    R-->>O: verdict + metrics only
     O->>G: update telemetry, state gate, result/error
     O->>G: pass completion guard, write final report
     O->>U: concise completion report
@@ -189,6 +206,7 @@ message protocol. The primary user-facing workflow is `/awm goal`.
 /awm agents test [--all | <agent-selector>] [--smoke] [--live]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
+/awm goals [<goal request>] [--policy <policy>] [--with <agents>]
 /awm goal list [--state <state>] [--limit <n>]
 /awm goal history [goal-id] [--limit <n>]
 /awm goal status [goal-id]
@@ -223,12 +241,13 @@ Important rules:
   `/awm agent add deepseek OpenCode DeepSeek` register the explicit alias
   `deepseek -> opencode:deepseek:auto`.
 - Natural language can trigger non-goal AWM commands when the intent is clear,
-  but it must not create a new goal. Ask the user to use `/awm goal ...` for
-  goal-level orchestration.
+  but it must not create a new goal. Ask the user to use `/awm goal ...` or
+  `/awm goals ...` for goal-level orchestration.
 - Goal records store state, compact results, and errors, not full transcripts.
 - `AIMemory/goals/ACTIVE.md` points to the current goal and resume checkpoint.
 - `AIMemory/goals/INDEX.md` lists current and previous goals, status, dates,
-  token/cost telemetry when available, and final report links.
+  quality score, worker/orchestrator token and cost telemetry when available,
+  and final report links.
 - The orchestrator updates lightweight telemetry so long-running work can
   resume without loading raw worker transcripts.
 - The orchestrator writes one integrated final report when the goal completes.
@@ -248,6 +267,7 @@ Legacy aliases:
 
 ```text
 /awm goals            -> /awm goal list
+/awm goals <request>  -> /awm goal <request>
 /awm status --all     -> /awm goal list
 /awm status <goal-id> -> /awm goal status <goal-id>
 /awm pause <goal-id>  -> /awm goal pause <goal-id>
@@ -266,7 +286,8 @@ state in markdown so any agent can resume it.
 - **Goal history ledger**: `AIMemory/goals/INDEX.md` is lazy-read for
   `/awm goal list`, `/awm status --all`, or user questions about previous goals.
   It shows objective, state, created/updated/completed times, orchestrator,
-  token/cost telemetry, final report path, and goal record path.
+  quality score, worker/orchestrator token and cost telemetry, final report
+  path, and goal record path.
 - **Goal contract**: each `AIMemory/goals/<goal-id>.md` stores objective,
   parsed tasks, worker assignments, policy, results, errors, telemetry, and
   completion guard status.
@@ -274,6 +295,33 @@ state in markdown so any agent can resume it.
   `awaiting_user`, `paused`, and `error_paused` stop auto-run immediately.
 - **Budget/telemetry loop**: compact counters and checkpoints are updated after
   each worker result; raw logs stay in `.agent-work-mux/runs/`.
+- **Quality contract**: implementation goals should include explicit quality
+  gates before dispatch, so workers optimize for good code instead of only
+  passing the visible spec.
+- **Integration contract**: the orchestrator defines component boundaries,
+  public data/API contracts, assembly rules, and end-to-end acceptance so the
+  parts add up to the requested whole.
+- **Dispatch preview**: before the first worker launch, the orchestrator shows a
+  compact plan with the objective, output root, design summary, phases,
+  phase-by-phase worker/verifier assignments, capsule paths, timeout policy,
+  quality gates, and controller/verifier role boundary. Auto-run continues by
+  default unless the user interrupts or the plan is ambiguous.
+- **Verifier-owned logs**: when a verifier/tester task exists, that verifier
+  reads worker logs and writes a compact `verdict.json`; the orchestrator waits
+  for that verdict instead of tailing raw worker stdout.
+- **Controller trust discipline**: after dispatch, the orchestrator trusts the
+  worker/verifier binding and avoids repeated source inspection, test reruns,
+  or progress-log reads unless a timeout, missing capsule, failed exit, or
+  explicit debug request appears.
+- **Controller role boundary**: when a verifier/tester is assigned, backend
+  tests, frontend tests, smoke tests, live server/API/browser probes, quality
+  review, and raw-log summarization belong to that verifier/tester. The
+  orchestrator focuses on design, dispatch, capsule validation, final decision,
+  and final report.
+- **Implementer boundary**: when a verifier/tester is assigned, implementers
+  create the app, scripts, and artifacts, but do not run acceptance phases or
+  direct long-running commands such as `npm start`. Live service checks and
+  process cleanup stay with the verifier/tester.
 - **Completion guard**: a goal cannot become `complete` until every task is
   resolved, errors are either fixed or documented, tests/verification are
   recorded, and the final report is written.
@@ -393,12 +441,151 @@ Runner rules:
 
 - runner instructions are lazy-loaded from `runner.md` or `AIMemory/RUNNER.md`
   only after an explicit `/awm` command
+- helper programs are lazy-materialized from `*.js.md` helper specs into
+  `.agent-work-mux/bin/` during setup/probe/first runner use, then treated as
+  stable local runtime artifacts. Normal goal prompts must not mutate helper
+  prompts or regenerate executables mid-run
+- helper generation should not introduce a new runtime dependency by default:
+  use PowerShell plus an optional `.cmd` shim on Windows, POSIX `sh` on
+  Unix-like systems, and only use `bash`, Node, or .NET when setup/probe
+  explicitly selects that available fallback. Windows `.cmd` files are shims;
+  internal runner calls use the real helper entrypoint with explicit arguments
+- generated helpers must pass self-tests for the current OS/runtime feature
+  matrix before any model-backed worker dispatch
+- helper names and required parameters are fixed by the helper ABI:
+  `awm-launch <launch.json>`,
+  `awm-watch --run-dir <dir> --expected-capsule <file> --attempt-id <id>
+  --timeout-ms <n> --idle-ms <n> --json`,
+  `awm-helper-self-test --manifest <file> --json`, and
+  `awm-capsule-probe --agent <selector> --run-dir <dir> --expected-capsule <file>
+  --timeout-ms <n> --json`
+- generators may add OS-specific wrappers, but must not rename helpers or change
+  required parameters. Unsupported required ABI features block setup/probe
+- protocol-defined relative path structure is also fixed. The absolute project
+  root or selected output root may vary, but files under that root keep the same
+  names and layout. For example, a run isolated under `testprj001/phase001/`
+  still uses `testprj001/phase001/.agent-work-mux/runs/<goal-id>/<task-id>/launch.json`,
+  `result.json`, `verdict.json`, `watch.json`, and
+  `.agent-work-mux/runs/<goal-id>/metrics/summary.json`
+- the helper ABI and path ABI are shared by generated helper programs,
+  controller, worker, verifier, tester, and fixer. The controller/launcher
+  precreates runner-owned directories for every phase; other roles write files
+  into those prepared locations instead of creating alternate runner paths
+- new `/awm goal` runs show a compact dispatch preview before the first worker
+  launch: design, phases, worker/verifier assignments, quality gates, capsule
+  paths, timeouts, and controller boundary
 - raw worker output goes under ignored `.agent-work-mux/runs/<goal-id>/`
-- the main orchestrator reads compact summaries/errors/results by default
-- raw logs are loaded only for explicit debugging
+- implementers write or are reduced to compact `result.json` capsules
+- implementers write a parseable `result.json` skeleton before expensive or
+  potentially long-running commands, so a later stall is not information-free
+- verifiers own raw worker-log inspection and return compact `verdict.json`
+  capsules with PASS/FAIL, score, blockers, warnings, and controller action
+- the main orchestrator reads compact capsules and metrics by default
+- raw logs are loaded by the orchestrator only for explicit debugging
+- workers that miss their required capsule before the timebox are treated as
+  `TIMEOUT_MISSING_CAPSULE`, not indefinite progress
+- if an expected capsule is missing, the launcher returns non-zero even when the
+  child process exits `0`; compact capsule status outranks raw child exit code
+- verifiers write an initial `verdict.json` skeleton before expensive checks and
+  update it after each phase, so timeout recovery has evidence
+- verifier timeboxes are split into startup/no-output, active-work, and
+  finalization grace periods
+- default code-goal timeboxes are 30 minutes for broad implementation and 30
+  minutes for verification, plus a 3 minute verdict-finalization grace period
+- background dispatch uses a shell-free `launch.json` contract with `cwd`,
+  `cmd`, and `args[]`; worker CLIs must not be launched through one long
+  `Start-Process` command string
+- launcher/controller code precreates runner-owned task, capsule, log, status,
+  diagnostic, prompt, and metrics parent directories with idempotent filesystem
+  APIs before dispatch; workers/verifiers should not create those runner paths
+- on Windows, do not put `mkdir -p` in worker/verifier prompts or bridge
+  commands. Use Node recursive mkdir or PowerShell
+  `New-Item -ItemType Directory -Force` for app-owned directories, and treat
+  "already exists" as success
+- compact runner files such as `result.json`, `verdict.json`,
+  `controller_status.json`, `diagnostics.json`, and metrics summaries should be
+  written through a same-directory temp file followed by rename
+- Windows npm/global shims such as `opencode.cmd` or `opencode.ps1` are resolved
+  before spawn to the real executable and package entrypoint, for example
+  `node.exe` plus the CLI's JS entrypoint; `shell: true` is not the fallback
+- OpenCode on Windows should use launch `"stdio_mode": "file"` or an equivalent
+  bridge. Do not capture OpenCode stdout/stderr through Node pipe streams for
+  background workers; connect them directly to files and poll file sizes
+- OpenCode prompt files are passed as `prompt_file` with
+  `"prompt_mode": "inline"` and `{{awm_prompt_text}}` in the normal message; do
+  not rely on a broad worker reading its own prompt file, do not pass the worker
+  prompt itself through OpenCode `--file`, and put any source-file `--file` args
+  after the message
+- provider secrets belong in launch `required_env`; for OpenCode DeepSeek,
+  require `DEEPSEEK_API_KEY` and let the launcher hydrate it from Windows
+  User/Machine scope when available. Missing required auth is a critical launch
+  failure, not a verifier finding
+- when the launcher already sets `cwd`, avoid passing the same workspace path
+  again through `--dir`, `--cwd`, or positional path args; prefer relative paths
+  from the task workspace
+- launch/runtime failures are classified separately from verifier judgments:
+  `LAUNCH_FAILED` means the process never started correctly, while
+  `RUNTIME_FAILED_NO_CAPSULE` means it exited quickly without the expected
+  capsule
+- capsule presence wins over bridge exit-code uncertainty: when the expected
+  capsule exists, classify as `CAPSULE_PRESENT`; `ExitCode = null` or a non-zero
+  child exit is diagnostics only and must not leave `critical-error.json`
+- diagnostic output is split by actionability: `stderr.log` remains raw private
+  evidence, `warnings.jsonl` flows to the verifier, `critical-error.json` is the
+  controller intervention signal, and `diagnostics.json` carries compact status
+  and byte counts
+- timeout checks are task-attempt scoped: runtime timeout starts at
+  `process_started_at` from the current pid/heartbeat, not at goal creation,
+  run-directory mtime, `launch.json` mtime, or a stale previous status file
+- the launcher records `task_started_at` for the current attempt and passes it
+  to workers through `AWM_TASK_STARTED_AT`, `AWM_DEADLINE_AT`, and related env
+  vars or prompt placeholders, so capsules can report the same timing anchor
+- fix loops are bounded; after verification, retries must be narrow and tied to
+  a specific verifier finding
+- `deepseek_build_verify_codex_fix` is the recommended cost/quality preset:
+  DeepSeek implements, DeepSeek verifies, Codex applies only narrow verifier
+  findings, and DeepSeek verifies the final result
+- the orchestrator does not personally run smoke/API/browser checks when a
+  tester/verifier owns them
+- implementers also do not run verifier-owned acceptance phases in that mode;
+  they avoid foreground `npm start` checks and leave live-service cleanup to
+  the verifier/tester
+- progress logging before verifier completion is sparse: dispatch, verdict,
+  final completion or pause
 
 This follows RTK-style token isolation: worker output must not flood the main
 agent context.
+
+For code goals, the planner should add a quality contract before dispatch.
+Useful default gates include input validation, body size limits, atomic JSON
+writes, safe localhost binding, safe Markdown/link rendering, normalized tags,
+deterministic list ordering, README/run instructions, `.gitignore`, no
+generated dependency folders, phase tests, and smoke checks. The verifier
+should score against that contract, not merely rerun tests.
+
+The planner should also add an integration contract. It names the components,
+their public contracts, how they assemble, and which end-to-end behavior proves
+the whole. The verifier/tester validates the integration contract; the
+orchestrator trusts that verdict unless a debug exception applies.
+
+When the verifier returns `PASS`, no blockers, and a score at or above the
+quality threshold, the orchestrator accepts the goal instead of chasing extra
+quality points. Metrics should be written to
+`.agent-work-mux/runs/<goal-id>/metrics/summary.json` with worker and
+orchestrator token usage kept separate.
+
+For Node.js goals, generated dependency folders are judged as deliverables, not
+as transient test state. Implementers should create `.gitignore` before
+`npm install`; `node_modules` may exist after verification if ignored and not
+listed in `artifact_paths`. Verifiers should not recursively scan dependency
+folders.
+
+In the `deepseek_build_verify_codex_fix` preset, Codex is not a second
+long-running reviewer. It is a narrow patcher. It acts only when the verifier
+returns `controller_action: fix` with precise findings and allowed file scope,
+then hands the result back to the verifier for the final verdict. When the
+orchestrator is already Codex, do not call Codex CLI for this step unless the
+user explicitly asks for live Codex CLI execution.
 
 ---
 
@@ -477,7 +664,8 @@ goal-level orchestration and worker routing.
   handoffs.
 - Use environment variables or ignored local overrides for private runner data.
 - Natural language may route clear non-goal AWM intents. New goal creation
-  still requires `/awm goal ...`, and guarded CLI live-run rules still apply.
+  still requires `/awm goal ...` or `/awm goals ...`, and guarded CLI live-run
+  rules still apply.
 - If an agent is unsure, it appends a `NOTE` instead of guessing silently.
 
 ---
@@ -496,7 +684,9 @@ goal-level orchestration and worker routing.
 ```
 
 See [`examples/`](examples/) for sample `INDEX.md`, `ACTIVE.md`, goal ledger,
-`INSTALLATION.md`, `AGENTS.md`, goal records, and manual handoff files.
+`INSTALLATION.md`, `AGENTS.md`, goal records, manual handoff files, and
+illustrative runner helper artifacts. Canonical helper source belongs in
+tracked `*.js.md` helper specs.
 
 ---
 

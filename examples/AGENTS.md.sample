@@ -10,6 +10,7 @@ by task difficulty and records the choice in the goal record.
 ## Default orchestration policy
 
 - default_policy: single_agent
+- available_policies: single_agent, implement_then_verify, deepseek_build_verify_codex_fix, parallel_review, custom
 - verifier_required: user_selectable
 - headless_requires_explicit_awm: true
 - goal_auto_run_default: true
@@ -17,6 +18,63 @@ by task difficulty and records the choice in the goal record.
 - goal_ledger_file: AIMemory/goals/INDEX.md
 - completion_guard_required: true
 - telemetry_policy: compact_only
+- helper_source_policy: markdown_canonical_generated_local
+- helper_source_format: js.md_script_spec
+- helper_source_runtime_requirement: none_os_default_shell_first
+- helper_materialization_policy: lazy_on_setup_probe_or_first_runner_use
+- helper_preferred_materialization_time: setup_or_agent_registration
+- helper_generation_root: .agent-work-mux/bin
+- helper_manifest_file: .agent-work-mux/helpers/manifest.json
+- helper_windows_runtime_preference: powershell_with_cmd_shim
+- helper_unix_runtime_preference: posix_sh
+- helper_optional_runtime_fallbacks: bash,node,dotnet
+- helper_external_runtime_default: forbidden
+- helper_runtime_fallback_requires_probe_selection: true
+- helper_cmd_shim_role: stable_name_wrapper_only
+- agent_launch_prototype_root: .agent-work-mux/helpers/agents/<alias>
+- agent_launch_prototype_required_before_goal_dispatch: true
+- agent_refresh_command: /awm agent refresh <alias>
+- launch_profile_refresh_policy: explicit_only
+- helper_generation_required_before_dispatch: true
+- helper_self_test_required: true
+- helper_prompt_mutation_after_generation: forbidden
+- helper_stale_policy: block_until_explicit_setup_or_probe_regenerates
+- helper_os_feature_matrix_required: true
+- helper_abi_version: awm-helper-abi-v1
+- helper_names_and_params_stable: true
+- helper_generator_may_change_required_params: false
+- helper_manifest_records_abi: true
+- runner_relative_path_abi_stable: true
+- runner_absolute_roots_may_vary: true
+- runner_path_segments_may_change_per_run: false
+- runner_abi_shared_by_all_roles: true
+- controller_precreates_runner_dirs_for_all_phases: true
+- worker_verifier_tester_fixer_create_runner_dirs: false
+- capsule_handshake_probe_required_for_dispatch: true
+- controller_log_policy: verifier_owned_logs
+- controller_trust_discipline: true
+- controller_role_boundary: design_dispatch_capsule_final_only
+- result_capsule_required: true
+- implementer_capsule_skeleton_required: true
+- implementer_phase_validation_when_verifier_assigned: forbidden
+- implementer_direct_long_running_start_commands: forbidden
+- bounded_self_checks_only: true
+- missing_capsule_status: TIMEOUT_MISSING_CAPSULE
+- verifier_capsule_skeleton_required: true
+- filesystem_creation_policy: launcher_precreates_runner_owned_parent_dirs
+- filesystem_creation_idempotent: true
+- runner_owned_directory_creation_by_worker: forbidden
+- windows_mkdir_p_forbidden: true
+- expected_capsule_precreation_by_controller: forbidden
+- capsule_schema_template_precreation: allowed
+- compact_file_atomic_write_policy: same_directory_temp_then_rename
+- watcher_helper: awm-watch
+- watcher_raw_log_default: false
+- watcher_statuses: CAPSULE_PRESENT,CAPSULE_IN_PROGRESS,RUNNING_ACTIVE,RUNNING_IDLE,ERROR_PRESENT,INVALID_CAPSULE,EXITED_NO_CAPSULE,TIMEOUT_MISSING_CAPSULE,STALE_HEARTBEAT
+- task_id_defaults: implement,verify,fix_codex,verify_final
+- task_id_path_slug_preference: alnum_underscore
+- shared_helper_per_phase_config_split: true
+- final_accept_source: verifier_verdict
 - agent_call_probe: lazy
 - agent_registration: natural_language_aliases
 
@@ -64,7 +122,7 @@ Do not add them here.
 ## Agent call hints
 | Agent | Last tested | CLI/version | Headless status | Invocation hint | Telemetry | Known quirks |
 |-------|-------------|-------------|-----------------|-----------------|-----------|--------------|
-| opencode | 2026-05-08 | opencode 1.14.33 | pass | `opencode run --model deepseek/deepseek-v4-flash --format json "<prompt>"` | JSON events include `step_finish` tokens/cost | Put message before repeated `--file` args. |
+| opencode | 2026-05-08 | opencode 1.14.33 | pass | `opencode run --model deepseek/deepseek-v4-flash --format json "<prompt>"` | JSON events include `step_finish` tokens/cost | Use file stdio on Windows, inline worker prompts, and require early capsules; put message before repeated `--file` args. |
 | continue | 2026-05-08 | Continue CLI 1.5.45 | pass | `cn [--config <config-if-needed>] --readonly -p "<prompt>" --format json` | JSON output in headless mode; `cn serve --port <port>` `/state` passed | Any working Continue secret setup is valid; local env fallback needed explicit `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}` on this probe. |
 | codex | 2026-05-08 | codex-cli 0.128.0 | guarded_check_only | default: `codex --version`; live on request: `codex exec --ephemeral --json --output-last-message <file> --cd <project> "<prompt>"` | Default probe collects no token telemetry; live runs emit JSONL `turn.completed` usage. | Guarded CLI: require explicit user request or `--live`. |
 | gemini | 2026-05-08 | gemini-cli 0.41.2 | guarded_check_only | default: `gemini --version`; live on request: `gemini --prompt "<prompt>" --approval-mode plan --output-format json --skip-trust` | Default probe collects no token telemetry; live runs emit JSON stats. | Guarded CLI, especially from Antigravity/Gemini contexts: require explicit user request or `--live`. |

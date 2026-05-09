@@ -73,12 +73,21 @@ You need this for Task 7 (Obsidian).
 
 ### Task 3 - Create the AIMemory directory tree
 
+Create these directories at the project root with an idempotent, OS-native
+command:
+
 ```bash
+# macOS / Linux / git-bash
 mkdir -p AIMemory/archive AIMemory/cold AIMemory/goals
 ```
 
-at the project root. `archive/` holds rotated warm logs; `cold/` holds
-period digests (see Section A.7 for the tiering rules).
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force -Path AIMemory/archive,AIMemory/cold,AIMemory/goals | Out-Null
+```
+
+`archive/` holds rotated warm logs; `cold/` holds period digests (see
+Section A.7 for the tiering rules).
 
 ### Task 4 - Write `AIMemory/PROTOCOL.md`
 
@@ -121,8 +130,8 @@ Use a sentinel block:
 <!-- agent-work-mux:start sha256=<hash> -->
 This project uses AgentWorkMux. Read AIMemory/INDEX.md,
 AIMemory/PROJECT_OVERVIEW.md, and recent AIMemory/work.log before acting.
-Use /awm goal for new goal orchestration. Other AWM commands may be invoked
-by clear natural-language requests; follow guarded CLI live-run rules.
+Use /awm goal or /awm goals for new goal orchestration. Other AWM commands may
+be invoked by clear natural-language requests; follow guarded CLI live-run rules.
 <!-- agent-work-mux:end -->
 ```
 
@@ -134,8 +143,8 @@ provide `[System.Security.Cryptography.SHA256]::HashData`:
 $reminderText = @(
   'This project uses AgentWorkMux. Read AIMemory/INDEX.md,'
   'AIMemory/PROJECT_OVERVIEW.md, and recent AIMemory/work.log before acting.'
-  'Use /awm goal for new goal orchestration. Other AWM commands may be invoked'
-  'by clear natural-language requests; follow guarded CLI live-run rules.'
+  'Use /awm goal or /awm goals for new goal orchestration. Other AWM commands may'
+  'be invoked by clear natural-language requests; follow guarded CLI live-run rules.'
 ) -join "`r`n"
 $sha256 = [System.Security.Cryptography.SHA256]::Create()
 try {
@@ -871,11 +880,12 @@ the user explicitly opts into removing local legacy state.
 
 ## `/awm` command namespace
 
-`/awm` is the canonical command namespace. New goal orchestration MUST use the
-literal `/awm goal` form. Every other AWM command may also be invoked through a
-clear natural-language request, for example asking to set up AgentWorkMux, list
-agents, register a worker, test agents, show hints, uninstall, run a named
-non-goal task, or create a manual handoff.
+`/awm` is the canonical command namespace. New goal orchestration MUST use an
+explicit goal command form: `/awm goal <request>` or `/awm goals <request>`.
+Every other AWM command may also be invoked through a clear natural-language
+request, for example asking to set up AgentWorkMux, list agents, register a
+worker, test agents, show hints, uninstall, run a named non-goal task, or
+create a manual handoff.
 
 Supported command contract:
 
@@ -885,9 +895,11 @@ Supported command contract:
 /awm agents list
 /awm agents add <description> [--as <alias>] [--selector <agent[:model-or-tier[:profile]]>] [--capabilities <tags>]
 /awm agent add <alias> <selector-or-description> [--capabilities <tags>]
+/awm agent refresh <alias>
 /awm agents test [--all | <agent-selector>] [--smoke] [--live]
 /awm agents hints [agent-selector]
 /awm goal <goal request> [--policy <policy>] [--with <agents>]
+/awm goals [<goal request>] [--policy <policy>] [--with <agents>]
 /awm goal list [--state <state>] [--limit <n>]
 /awm goal history [goal-id] [--limit <n>]
 /awm goal status [goal-id]
@@ -907,6 +919,20 @@ Setup must keep project-safe routing in AIMemory and ask before writing any
 private local override under `.agent-work-mux/`. It does not authorize worker
 dispatch by itself.
 
+Runner helper code is markdown-sourced and lazy-materialized. Canonical helper
+bodies live in tracked `*.js.md` markdown helper specs, for example
+`helpers/awm-launch.js.md` and `helpers/awm-watch.js.md`, rather than in bare
+executable source files. The `js.md` suffix marks the tracked script-spec
+markdown source; it does not require the generated helper to be JavaScript. Each
+helper spec includes generation notes, OS/runtime differences, validation rules,
+and extractable OS-specific code blocks. Setup/probe/runner onboarding may
+extract OS/runtime-appropriate helpers into ignored `.agent-work-mux/bin/`
+files, write a local helper manifest with source hashes, and self-test those
+helpers. Generated helper files are stable local runtime artifacts, not project
+source. Do not modify normal goal prompts to regenerate helpers after they have
+been created. If a helper is missing or stale, run explicit helper
+onboarding/setup before dispatch.
+
 `/awm agents` and `/awm agents list` read `AIMemory/AGENTS.md` and print the
 registered aliases plus the latest compact call hints. Natural language such
 as "registered agents 보여줘" maps here without testing or dispatching workers.
@@ -914,13 +940,21 @@ as "registered agents 보여줘" maps here without testing or dispatching worker
 `/awm agents add` and singular `/awm agent add` register project-scoped aliases
 in `AIMemory/AGENTS.md`. The plural form may infer the alias from a
 description. The singular form treats the first argument after `add` as the
-alias. For example, `/awm agents add 오픈코드의 딥시크` normalizes to
+alias. Registration should also ensure helper materialization has run and create
+the alias launch prototype, or mark the alias `helper_onboarding_required` /
+`launch_profile_missing`. For example, `/awm agents add 오픈코드의 딥시크` normalizes to
 `opencode-deepseek -> opencode:deepseek:auto`, while both
 `/awm agent add 딥시크 오픈코드:딥시크` and
 `/awm agent add 딥시크 오픈코드의 딥시크` normalize to
-`딥시크 -> opencode:deepseek:auto`. The command updates routing metadata only;
-it must not claim the worker is callable until
-`/awm agents test <alias> --smoke` passes.
+`딥시크 -> opencode:deepseek:auto`. The command updates routing metadata and
+creates local helper/launch prototypes, but it must not claim the worker is
+callable until `/awm agents test <alias> --smoke` passes and must not dispatch
+the worker during registration unless the user explicitly requested a live test.
+
+`/awm agent refresh <alias>` is the explicit command for regenerating an existing
+alias's launch prototype. A controller must ask the user to run this or another
+explicit setup/probe command when helpers or launch profiles are stale; it must
+not silently refresh them during `/awm goal`.
 
 `/awm agents test` lazy-loads `agent-call-probe.md` and verifies configured
 worker invocations before real goal dispatch. It stores raw probe logs in
@@ -934,6 +968,12 @@ calls such as Codex invoking Codex CLI, Claude invoking Claude CLI, or
 Antigravity/Gemini invoking Gemini CLI by default. Re-run the probe when an
 agent CLI version changes. `/awm agents hints` reads existing hints without
 calling agents.
+
+When live/smoke probing is authorized, the probe must verify the runner contract
+as well as the text response: generated launcher/watch helpers work, runner-owned
+directories are precreated, the external agent can write a skeleton capsule into
+an existing directory using same-directory temp+rename, and missing or malformed
+capsules are classified without raw-log inspection.
 
 Known default smoke surfaces include OpenCode `opencode run --format json`,
 Continue CLI `cn --readonly -p ... --format json` and `cn serve --port <port>`,
@@ -950,14 +990,16 @@ DeepSeek 401, use an explicit local config secret reference such as
 `apiKey: ${{ secrets.//DEEPSEEK_API_KEY }}`.
 
 Natural language command routing MUST NOT turn a broad project objective into
-a new goal. If the user asks for goal-level orchestration without `/awm goal`,
-ask them to use `/awm goal ...`. Natural language can still route safe
-management commands and explicit non-goal worker requests, while guarded CLI
-live-run rules remain in force. If intent is ambiguous, ask a short
-confirmation or provide a dry-run plan.
+a new goal. If the user asks for goal-level orchestration without `/awm goal`
+or `/awm goals`, ask them to use one of those explicit goal forms. Natural
+language can still route safe management commands and explicit non-goal worker
+requests, while guarded CLI live-run rules remain in force. If intent is
+ambiguous, ask a short confirmation or provide a dry-run plan.
 
 New goal creation accepts either a quoted request or an unquoted shorthand.
-Parse `/awm goal` by checking the first token after `goal`:
+Parse `/awm goal` by checking the first token after `goal`. Parse `/awm goals`
+the same way, except bare `/awm goals` with no request maps to
+`/awm goal list`:
 
 - If the first token is `list`, `history`, `status`, `pause`, `resume`,
   `stop`, or `clear`, treat it as the reserved subcommand.
@@ -974,6 +1016,7 @@ Legacy aliases MAY be supported:
 
 ```text
 /awm goals            -> /awm goal list
+/awm goals <request>  -> /awm goal <request>
 /awm status --all     -> /awm goal list
 /awm status <goal-id> -> /awm goal status <goal-id>
 /awm pause <goal-id>  -> /awm goal pause <goal-id>
@@ -982,6 +1025,12 @@ Legacy aliases MAY be supported:
 
 `/awm goal` creates a goal contract and defaults to auto-run after parsing and
 planning. The user can pause or stop from the active orchestrator session.
+Before the first worker launch, the controller must show a compact dispatch
+preview: objective, output root, design summary, phase list, phase-by-phase
+worker/verifier assignment, quality gates, capsule paths, timeout policy, and
+controller/verifier role boundary. This preview is the last visible checkpoint
+before auto-run continues; it is not an approval gate unless the user requested
+approval mode, the plan is ambiguous, or the user interrupts and revises it.
 Goal files live under `AIMemory/goals/<goal-id>.md` and store compact state,
 tasks, results, errors, telemetry, and completion guard status, not verbose
 transcripts. `AIMemory/goals/ACTIVE.md` is the active goal cursor: it points to
@@ -991,8 +1040,9 @@ the goal completes.
 
 `AIMemory/goals/INDEX.md` is the lazy-read goal history ledger. It lists current
 and previous goals with objective, state, created/updated/completed timestamps,
-orchestrator, policy, token/cost telemetry when available, final report path,
-and goal record path. Normal sessions do not need to load it unless the user
+orchestrator, policy, quality score, worker/orchestrator token and cost
+telemetry when available, final report path, and goal record path. Normal
+sessions do not need to load it unless the user
 asks for historical goal status or invokes `/awm goal list` /
 `/awm status --all`.
 
@@ -1005,11 +1055,13 @@ Dynamic goal mechanics:
 3. **Goal contract object** - treat the goal record as the durable contract:
    objective, parsed tasks, worker assignments, policy, state, telemetry,
    results, errors, and completion guard.
-4. **State gate** - dispatch is allowed only while state is `active`.
+4. **Dispatch preview** - show the compact plan/phase/assignment preview before
+   the first worker launch; update it if the user revises the plan.
+5. **State gate** - dispatch is allowed only while state is `active`.
    `awaiting_user`, `paused`, and `error_paused` stop auto-run immediately.
-5. **Budget/telemetry loop** - keep compact counters, checkpoints, and raw-log
+6. **Budget/telemetry loop** - keep compact counters, checkpoints, and raw-log
    pointers in the goal record; do not load raw transcripts unless debugging.
-6. **Completion guard** - mark `complete` only after all tasks are resolved,
+7. **Completion guard** - mark `complete` only after all tasks are resolved,
    errors are fixed or documented, verification is recorded, and the final
    report exists.
 
@@ -1017,9 +1069,10 @@ Minimum goal contract fields:
 
 - `Goal-id`, `Objective`, `Created`, `Updated`, `Created by`, `Orchestrator`
 - `State`, `Auto-run`, `Policy`, `Budget hint`, `Raw-log root`
-- user request, parsed plan, compact results, compact errors
-- telemetry: tasks total/complete, token usage/source, cost, last checkpoint,
-  raw logs loaded or not
+- user request, parsed plan, dispatch preview, compact results, compact errors
+- telemetry: tasks total/complete, worker token usage/source/cost,
+  orchestrator token usage/source/cost, known goal token total, last
+  checkpoint, raw logs loaded or not
 - completion guard checklist and final report
 
 Minimum `AIMemory/goals/INDEX.md` ledger columns:
@@ -1029,9 +1082,19 @@ Minimum `AIMemory/goals/INDEX.md` ledger columns:
 |---------|-----------|-------|---------|---------|-----------|--------------|--------|--------|------|--------------|--------|
 ```
 
-Token/cost values are best-effort. Use reported values when a runner provides
-them, `estimated:<value>` only when the estimate method is clear, and `unknown`
-otherwise. Do not load raw transcripts just to calculate token usage.
+Preferred new ledger columns split quality, worker usage, and controller usage:
+
+```markdown
+| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Quality score | Worker tokens | Orchestrator tokens | Worker cost | Orchestrator cost | Final report | Record |
+|---------|-----------|-------|---------|---------|-----------|--------------|--------|---------------|---------------|---------------------|-------------|-------------------|--------------|--------|
+```
+
+Token/cost values are best-effort but role-separated. Use reported values when
+a runner provides them, `estimated:<value>` only when the estimate method is
+clear, and `unknown` when unavailable. If the active Codex harness does not
+expose controller token telemetry, record `unknown (not exposed by harness)`
+for orchestrator tokens. Do not load raw transcripts just to calculate token
+usage.
 
 Required goal states:
 
@@ -1082,10 +1145,39 @@ and model/provider defaults to `<runner>:<model-or-tier>:auto` with alias
 `opencode-deepseek -> opencode:deepseek:auto`. If inference is ambiguous or
 would overwrite a different selector, ask before changing `AGENTS.md`. Mark new
 aliases as untested and recommend `/awm agents test <alias> --smoke`.
+Normalize common DeepSeek tier spellings before dispatch: `딥시크v4맥스`,
+`deepseekv4max`, or `max` means `deepseek-v4-pro:max`; `딥시크v4노멀`,
+`딥시크v4보통`, `deepseekv4normal`, `normal`, or `standard` means
+`deepseek-v4-flash:standard`; `딥시크v4플래시`, `deepseekv4flash`, or `flash`
+means `deepseek-v4-flash:flash`. Do not silently upgrade verifier/tester work
+from normal/standard/flash to max/pro.
 
 Implementer/verifier separation is optional policy, not a protocol default.
-Users may choose `single_agent`, `implement_then_verify`, or another
-project-defined policy in `AGENTS.md` or per `/awm goal`.
+Users may choose `single_agent`, `implement_then_verify`,
+`deepseek_build_verify_codex_fix`, or another project-defined policy in
+`AGENTS.md` or per `/awm goal`. When verification is enabled, the verifier owns
+raw worker-log inspection and returns a compact verdict for the orchestrator.
+The verifier is a quality gate, not only a test rerunner.
+
+`deepseek_build_verify_codex_fix` is a cost/quality preset for code goals:
+DeepSeek-backed workers do the broad implementation and verifier/tester work;
+the current Codex controller performs only narrow patches from precise verifier
+findings; the final accept/fix/pause decision still comes from the final
+verifier verdict. In Codex-controlled runs, this uses the in-session Codex
+controller as fixer and MUST NOT call Codex CLI unless the user explicitly asks
+for live Codex CLI execution. If the verifier finding is broad, ambiguous, or
+lacks allowed file scope, pause instead of letting Codex explore.
+
+For software implementation goals, the planner SHOULD write a compact quality
+contract before dispatch. The contract should name the acceptance threshold,
+hard fail gates, warning gates, and domain checklist. For web/API goals, useful
+default gates include input validation, body size limits, safe local binding,
+atomic JSON writes, unsafe Markdown/link protocol rejection, normalized tags or
+structured fields, deterministic list ordering, run instructions, `.gitignore`,
+no generated dependency folders as deliverables, phase tests, and smoke checks.
+The contract should also name stop conditions: maximum fix rounds, when warnings
+are accepted, and when the controller must pause instead of launching another
+worker.
 
 ## Lazy CLI runner and output isolation
 
@@ -1093,12 +1185,268 @@ The preferred v3 runner shape is a CLI runner, not MCP. The runner spec is
 lazy-loaded from `runner.md` in this repository or `AIMemory/RUNNER.md` after
 project setup. Do not load runner instructions during ordinary sessions.
 
+The runner remains markdown-first. Local executable helpers such as
+`awm-launch`, `awm-watch`, and capsule handshake probes are generated lazily from
+`*.js.md` helper specs into ignored `.agent-work-mux/bin/` during setup/probing
+or first runner onboarding. Real dispatch requires generated helpers to match
+their source hashes and pass self-tests; otherwise the controller must stop
+before launching model-backed workers. Helper generation prompts must follow the
+source spec's generation notes, OS/runtime differences, validation rules, and
+code blocks, then write a helper test report showing that all required OS shell
+and runtime features for the current environment passed. The default generated
+helper must not introduce a new external runtime dependency: use PowerShell plus
+an optional `.cmd` shim on Windows, POSIX `sh` on Unix-like systems, and only use
+`bash`, Node, .NET, or another runtime when setup/probe explicitly selects it as
+an available fallback. Windows `.cmd` helpers are shims for stable command names;
+internal runner calls should invoke the real helper entrypoint with explicit
+arguments and must not rely on `shell: true` or free-form shell text.
+
+Generated helper names and call parameters are an ABI, not generator choices.
+For the current protocol version the stable logical commands are `awm-launch
+<launch.json>`, `awm-watch --run-dir <dir> --expected-capsule <file>
+--attempt-id <id> --timeout-ms <n> --idle-ms <n> --json`,
+`awm-helper-self-test --manifest <file> --json`, and
+`awm-capsule-probe --agent <selector> --run-dir <dir> --expected-capsule <file>
+--timeout-ms <n> --json`. A generator may add OS-specific wrapper extensions,
+but it must not rename helpers, change required parameter names, or change
+required positional/flag semantics during generation. Unsupported required ABI
+features are setup/probe blockers.
+
+Prefer creating helper programs and agent launch prototypes during setup or
+agent registration/probe, not during each `/awm goal`. Registration-time
+prototype files live under ignored `.agent-work-mux/helpers/agents/<alias>/`
+and store stable invocation shape, required env names, supported stdio/prompt
+mode, and model/tier normalization without secrets. Per-task `launch.json` still
+varies by cwd, prompt, attempt id, expected capsule, and timeout, but it must be
+derived from the fixed prototype plus the path ABI rather than invented by a goal
+prompt.
+
+Existing launch prototypes are locked local runtime artifacts. They are created
+for new aliases during registration, and refreshed only through `/awm agent
+refresh <alias>` or an explicitly requested setup/probe upgrade. Refresh marks
+the capsule handshake stale until `/awm agents test <alias> --smoke` passes.
+
+Protocol-defined relative directory and file names are also an ABI. Absolute
+roots may vary by project, workspace, OS, or selected goal output directory, but
+the structure under those roots must not. Generators, launchers, workers,
+verifiers, and fixers must not rename or substitute runner-owned path segments
+such as `AIMemory/`, `AIMemory/goals/ACTIVE.md`, `AIMemory/goals/INDEX.md`,
+`.agent-work-mux/bin/`,
+`.agent-work-mux/helpers/manifest.json`,
+`.agent-work-mux/runs/<goal-id>/<task-id>/launch.json`,
+`prompt.txt`, `stdout.jsonl`, `stderr.log`, `warnings.jsonl`,
+`critical-error.json`, `diagnostics.json`, `controller_status.json`, `pid.json`,
+`heartbeat.json`, `watch.json`, `result.json`, `verdict.json`, and
+`.agent-work-mux/runs/<goal-id>/metrics/summary.json`. A missing fixed filename
+inside the expected relative structure is meaningful evidence. Do not silently
+map it to another name. When work is isolated under a nested output root such as
+`testprj001/phase001/`, that root anchors the same relative structure:
+`testprj001/phase001/.agent-work-mux/runs/<goal-id>/<task-id>/launch.json`,
+`result.json`, `verdict.json`, `watch.json`, and
+`testprj001/phase001/.agent-work-mux/runs/<goal-id>/metrics/summary.json` must
+be predictable from the root plus protocol path ABI. Path ABI changes require a
+protocol version bump and migration note, not a per-run choice.
+
+Default task ids are fixed unless the controller declares an explicit extension
+before dispatch: `implement`, `verify`, `fix_codex`, and `verify_final`. Extra
+task ids must be stable `[A-Za-z0-9_]+` slugs, listed in the dispatch preview and
+goal record, precreated by the controller/launcher, and passed as context to all
+roles. Shared helper binaries and alias launch prototypes live at the project
+root `.agent-work-mux/bin/` and `.agent-work-mux/helpers/`; per-goal/per-phase
+config and status live under the selected output root's `.agent-work-mux/runs/`.
+
+The helper ABI and path ABI are shared by generated helper programs, controller,
+worker, verifier, tester, and fixer roles. The controller/launcher precreates
+runner-owned directories for every phase by default before dispatch. Other roles
+write their required files into those prepared directories and must report
+failure instead of creating alternate runner-owned paths.
+
 Runner-local state goes under `.agent-work-mux/` and is ignored by git. Raw
 runner/sub-agent logs go under `.agent-work-mux/runs/<goal-id>/` or another
 private ignored path. This follows RTK-style token isolation: raw output must
 not flood the main agent context. Workers return compact summaries, errors,
-artifacts, and exit status to the orchestrator; the orchestrator records only
-those compact results in `AIMemory/goals/` and `work.log`.
+artifacts, and exit status to the runner. If a verifier/tester task exists, the
+verifier reads worker logs and artifacts, then writes a compact `verdict.json`
+containing PASS/FAIL, score, phase results, blockers, warnings, metrics, and
+controller action. The orchestrator reads `verdict.json`, compact metrics, and
+artifact paths by default; it must not tail raw worker stdout/stderr while
+waiting. Raw logs are loaded by the orchestrator only for explicit debugging or
+when the verifier asks for `debug_raw_log`.
+
+After dispatch, the orchestrator should trust the worker/verifier binding.
+It should not repeatedly inspect generated files, rerun tests, or read progress
+logs before the verifier finishes unless there is a timeout, non-zero exit,
+missing capsule, verifier-requested debug action, or explicit user request.
+Progress logging before verifier completion should be sparse: goal created,
+worker/verifier dispatched, verdict recorded, and final completion or pause.
+Use one strong dispatch prompt with output boundaries, quality contract,
+capsule schema, and scope rules instead of many mid-run corrections.
+Workers that do not produce required compact capsules before their timebox are
+`TIMEOUT_MISSING_CAPSULE`; if artifacts exist, review shifts to the verifier
+instead of keeping the controller in a wait/inspect loop.
+For verifier/tester tasks, use split timeboxes: startup/no-output, active work
+after the first machine-readable event, and a short finalization grace period
+after required phase commands pass. A verifier should create a parseable
+`verdict.json` skeleton with `status: IN_PROGRESS` before expensive checks and
+atomically update it after each phase, so timeout recovery has evidence.
+Default code-goal timeboxes are 30 minutes for broad implementer work and 30
+minutes for verifier/tester work, plus a 3 minute finalization grace period once
+required phase commands have completed or a terminal verdict is being written.
+Short smoke probes may use smaller explicit limits.
+
+Launch failures are separate from verifier judgments. Runner dispatch must use a
+shell-free launch contract: write
+`.agent-work-mux/runs/<goal-id>/<task-id>/launch.json` with `cwd`, `cmd`,
+`args[]`, env, stdout/stderr paths, pid/heartbeat/status files, expected capsule,
+and timeout; start the child with shell parsing disabled and set `cwd` as a
+process property. Do not launch worker CLIs through one long `Start-Process`
+argument string, and do not pass the same workspace path again through
+tool-specific `--dir`, `--cwd`, or positional path args when the launcher already
+sets `cwd`. On Windows, normalize npm/global CLI wrappers before spawn: if `cmd`
+resolves to `.cmd`, `.bat`, `.ps1`, or a POSIX-style shim, resolve it to the real
+executable/entrypoint such as `node.exe` plus the package JS entrypoint, and
+record requested command, resolved command, shim path, and entrypoint in
+diagnostics. Do not use `shell: true` as the fallback for wrappers. If the
+process never starts or no startup heartbeat appears, record `LAUNCH_FAILED`. If
+it starts and exits quickly without the expected capsule, record
+`RUNTIME_FAILED_NO_CAPSULE`. Inspect only the short stderr excerpt needed to
+decide whether a retry is safe.
+
+Filesystem creation is part of the launch contract, not an agent improvisation.
+The launcher/controller must precreate every runner-owned parent directory before
+dispatch: task run directory, capsule parent, stdout/stderr parents,
+status/heartbeat/diagnostic parents, metrics directories, and prompt-file
+directories. This applies to implementer, verifier, tester, and fixer phases.
+Creation must be idempotent: an existing directory is success. Use
+structured filesystem APIs such as Node `fs.mkdir(..., { recursive: true })` or
+PowerShell `New-Item -ItemType Directory -Force`; do not ask workers to rely on
+shell aliases. On Windows, `mkdir -p` is forbidden in worker/verifier prompts and
+runner bridge commands because PowerShell can parse it as `New-Item` and fail
+when the directory already exists. Workers and verifiers may create app-owned
+directories inside their output boundary, but runner-owned paths from
+`launch.json` must already exist. Prompts must say the capsule directory already
+exists, name the exact file to write, and explicitly forbid creating runner-owned
+directories. The launcher/controller may create schema/template files, but must
+not precreate the expected worker-owned `result.json` or verifier-owned
+`verdict.json`, because capsule presence is a control signal. Compact runner
+files such as `result.json`, `verdict.json`, `controller_status.json`,
+`diagnostics.json`, and metrics summaries should be written through a
+same-directory temp file followed by rename. Task ids that become runner path
+segments should be stable slugs; prefer `[A-Za-z0-9_]+` unless the project has
+explicitly declared a hyphenated id.
+
+Capsule presence outranks launcher exit-code uncertainty. If the expected
+capsule exists, classify the launch as `CAPSULE_PRESENT` and let the controller
+validate the capsule schema/status. A bridge `ExitCode = null` or non-zero child
+exit code is diagnostics only in that case and must not leave
+`critical-error.json`.
+The inverse is also part of the launch contract: if an expected capsule is
+missing, the launcher must return a non-zero exit code even when the child
+process exits `0`. The compact status, not the child exit code alone, decides
+whether dispatch succeeded.
+
+On Windows, OpenCode dispatch should prefer file-handle stdio redirection over
+Node pipe capture. A small `opencode run` can succeed through
+`Start-Process -RedirectStandardOutput` while hanging when launched by Node with
+stdout/stderr pipes. Preserve the same `launch.json` contract, but use
+`"stdio_mode": "file"` or an equivalent bridge that connects stdout/stderr
+directly to files and reports byte counts from file size polling.
+
+OpenCode prompt files use a special safety rule. Prefer `prompt_file` in
+`launch.json` with `"prompt_mode": "inline"` and put `{{awm_prompt_text}}` in the
+normal positional message. Do not rely on "read this prompt file" as the primary
+instruction for broad implementation tasks, and do not pass the worker prompt
+itself through OpenCode `--file`; `--file` is for workspace/source files and can
+cause a following message to be parsed as another file argument. If source files
+must be attached with `--file`, put the message before all `--file` args. A
+launcher may fail fast with `LAUNCH_FAILED/opencode_file_argument_order` when it
+detects a positional message after an OpenCode `--file`.
+
+Provider secrets are part of the launch contract. Launch specs should declare
+needed variables in `required_env`, such as `DEEPSEEK_API_KEY` for OpenCode
+DeepSeek. The launcher may hydrate missing required variables from Windows
+User/Machine scope without writing secret values to diagnostics, but a missing
+required provider secret is `LAUNCH_FAILED/missing_required_env` and requires
+controller/user action rather than verifier interpretation.
+
+Diagnostic streams are split by actionability. Normal output goes to
+`stdout.jsonl`; raw stderr goes to `stderr.log`; classified non-fatal warnings go
+to `warnings.jsonl`; controller-action failures go to `critical-error.json`; and
+compact byte counts/status/pointers go to `diagnostics.json`. Stderr length alone
+is not a verdict. Warnings flow to the verifier/tester. The controller responds
+only to `critical-error.json`, failed exit/capsule status, or explicit verifier
+`controller_action`, and it reads only the short critical excerpt by default.
+
+Bounded polling belongs in the generated `awm-watch` helper, not ad hoc
+controller loops. The watcher observes file mtimes, file sizes, pid/heartbeat,
+attempt id, `controller_status.json`, `diagnostics.json`, `critical-error.json`,
+and the expected capsule for the requested timeout/idle thresholds. It returns
+compact statuses such as `CAPSULE_PRESENT`, `CAPSULE_IN_PROGRESS`,
+`RUNNING_ACTIVE`, `RUNNING_IDLE`, `ERROR_PRESENT`, `INVALID_CAPSULE`,
+`EXITED_NO_CAPSULE`, `TIMEOUT_MISSING_CAPSULE`, and `STALE_HEARTBEAT`. By
+default it does not read raw stdout/stderr contents and never writes the expected
+capsule itself.
+
+Timeout checks are task-attempt scoped. Runtime timeout starts at
+`process_started_at`, when the child worker has a pid and heartbeat, not at goal
+creation time, run-directory mtime, `launch.json` mtime, parent controller
+session start, or any previous attempt's status file. `controller_status.json`
+and `diagnostics.json` must record `launcher_started_at`,
+`task_started_at`, `process_started_at`, `timeout_started_at`, `deadline_at`,
+`task_elapsed_ms`, and `launcher_elapsed_ms` when applicable. The launcher must
+record `task_started_at` immediately before spawning the child, pass it to the
+worker through environment variables such as `AWM_TASK_STARTED_AT`,
+`AWM_TIMEOUT_STARTED_AT`, `AWM_DEADLINE_AT`, and `AWM_ATTEMPT_ID`, and expand the
+same values in `args[]` placeholders when the prompt needs them. Startup/no-output
+timeout can only produce `LAUNCH_FAILED`; normal runtime timeout can produce
+`TIMEOUT_MISSING_CAPSULE`. Retries must use fresh attempt directories or matching
+`attempt_id`, and stale heartbeat/status files must be ignored. `pid.json` and
+`heartbeat.json` should include the current `attempt_id` so a controller can
+distinguish a live current process from a killed or superseded retry.
+
+The orchestrator/controller's normal role is design, dispatch, capsule
+validation, final decision, and final report. Backend tests, frontend tests,
+smoke tests, live server/API/browser probes, source-quality review, and raw-log
+summarization belong to the verifier/tester when one is assigned. The
+controller should not rerun those checks unless there is no verifier/tester,
+the verifier asks for controller-side debug, or the user explicitly requests
+controller retesting.
+For local service checks, the verifier/tester also owns process cleanup and
+must report whether any server was left running.
+When a verifier/tester is assigned, the implementer should not run those phase
+checks either. Implementer prompts should ask workers to create scripts and
+artifacts, write a parseable `result.json` skeleton early, and avoid direct
+long-running foreground commands such as `npm start`. Optional implementer
+self-checks must be bounded commands that terminate and clean up child
+processes.
+
+The controller is accountable for ensuring the designed components add up to
+the whole system. It should define component boundaries, public data/API
+contracts, assembly rules, and end-to-end acceptance before dispatch. The
+verifier/tester then proves both component contracts and the assembly contract;
+the controller uses that verdict instead of duplicating the tests.
+
+Repair loops are bounded. After verification, fixes must be narrow: cite the
+exact verifier finding, restrict file scope where possible, and require a
+compact result capsule. Accept `PASS` with no blockers and score at or above the
+configured threshold; do not chase extra quality points unless the user asks.
+If missing capsules repeat, pause or ask the user rather than launching another
+unconstrained worker.
+
+Metrics summaries should live at
+`.agent-work-mux/runs/<goal-id>/metrics/summary.json` and split worker,
+verifier, and controller/orchestrator token/cost usage. Include timed-out and
+failed attempts when the runner reports them. If controller token telemetry is
+not exposed by the host, record `unknown (not exposed by harness)` rather than
+folding it into worker totals.
+
+Generated dependency folders are judged as deliverables, not as transient test
+state. For Node.js goals, implementers should create `.gitignore` before
+`npm install`; `node_modules` may exist after verification if ignored and not
+listed in `artifact_paths`. It is a hard fail when dependency folders are
+included as deliverable artifacts, copied to the result bundle, committed, or
+left unignored. Verifiers should check top-level presence, `.gitignore`, and
+artifact manifests instead of recursively scanning dependency directories.
 
 ---
 
@@ -1241,8 +1589,8 @@ Before responding to a user prompt:
 - [ ] If the prompt starts with `/awm`, parse the command and update/create
       the matching goal, alias, or lifecycle record
 - [ ] If the prompt is plain natural language, route clear non-goal AWM
-      intents to the matching command; require literal `/awm goal` for new
-      goal orchestration
+      intents to the matching command; require `/awm goal ...` or
+      `/awm goals ...` for new goal orchestration
 - [ ] Before finishing, append WORK_END
 
 Before creating a new markdown file:
@@ -1259,6 +1607,7 @@ Before using the CLI runner:
 - [ ] Load runner instructions lazily (`runner.md` or `AIMemory/RUNNER.md`)
 - [ ] Create/update `AIMemory/goals/ACTIVE.md` before dispatch
 - [ ] Create/update the goal row in `AIMemory/goals/INDEX.md`
+- [ ] Show the compact dispatch preview before the first worker launch
 - [ ] Keep raw worker output in ignored `.agent-work-mux/runs/`
 - [ ] Record compact summaries/errors/results and telemetry in `AIMemory/goals/`
 - [ ] Run the completion guard before marking a goal `complete`
@@ -1387,6 +1736,7 @@ If the project uses cloud-synced AIMemory (per Section 6.3), append to your own
 session file under `AIMemory/sessions/` instead:
 
 ```bash
+# macOS / Linux / git-bash
 mkdir -p AIMemory/sessions
 SESSION_LOG="AIMemory/sessions/$(date -u +%Y-%m-%dT%H-%M)__claude-opus-4-5__claude-code.log"
 cat >> "$SESSION_LOG" <<'EOF'
@@ -1394,6 +1744,12 @@ cat >> "$SESSION_LOG" <<'EOF'
 ### 2026-04-26 14:30 | claude-opus-4-5 | PROJECT_BOOTSTRAPPED
 [...]
 EOF
+```
+
+On Windows PowerShell, create the directory with:
+
+```powershell
+New-Item -ItemType Directory -Force -Path AIMemory/sessions | Out-Null
 ```
 
 ---
@@ -1417,8 +1773,8 @@ From the next user message onward, on EVERY user turn:
    Create/update the relevant goal, alias, or lifecycle record. `/awm goal`
    defaults to auto-run after parsing and planning.
 6. **If the prompt is plain natural language, route clear non-goal AWM intents
-   to the matching command.** Require literal `/awm goal` for new goal
-   orchestration. Guarded CLI live-run rules still apply.
+   to the matching command.** Require `/awm goal ...` or `/awm goals ...` for
+   new goal orchestration. Guarded CLI live-run rules still apply.
 7. **Append WORK_START** when you begin acting (and for sessions that
    span a long gap, also `RE_ENGAGED` with capabilities at session start).
 8. **Use absolute paths** in any FILES_* events.
@@ -1689,6 +2045,7 @@ by task difficulty and records the choice in the goal record.
 ## Default orchestration policy
 
 - default_policy: single_agent
+- available_policies: single_agent, implement_then_verify, deepseek_build_verify_codex_fix, parallel_review, custom
 - verifier_required: user_selectable
 - headless_requires_explicit_awm: true
 - goal_auto_run_default: true
@@ -1696,6 +2053,107 @@ by task difficulty and records the choice in the goal record.
 - goal_ledger_file: AIMemory/goals/INDEX.md
 - completion_guard_required: true
 - telemetry_policy: compact_only
+- helper_source_policy: markdown_canonical_generated_local
+- helper_source_format: js.md_script_spec
+- helper_source_runtime_requirement: none_os_default_shell_first
+- helper_materialization_policy: lazy_on_setup_probe_or_first_runner_use
+- helper_preferred_materialization_time: setup_or_agent_registration
+- helper_generation_root: .agent-work-mux/bin
+- helper_manifest_file: .agent-work-mux/helpers/manifest.json
+- helper_windows_runtime_preference: powershell_with_cmd_shim
+- helper_unix_runtime_preference: posix_sh
+- helper_optional_runtime_fallbacks: bash,node,dotnet
+- helper_external_runtime_default: forbidden
+- helper_runtime_fallback_requires_probe_selection: true
+- helper_cmd_shim_role: stable_name_wrapper_only
+- agent_launch_prototype_root: .agent-work-mux/helpers/agents/<alias>
+- agent_launch_prototype_required_before_goal_dispatch: true
+- agent_refresh_command: /awm agent refresh <alias>
+- launch_profile_refresh_policy: explicit_only
+- helper_generation_required_before_dispatch: true
+- helper_self_test_required: true
+- helper_prompt_mutation_after_generation: forbidden
+- helper_stale_policy: block_until_explicit_setup_or_probe_regenerates
+- helper_os_feature_matrix_required: true
+- helper_abi_version: awm-helper-abi-v1
+- helper_names_and_params_stable: true
+- helper_generator_may_change_required_params: false
+- helper_manifest_records_abi: true
+- runner_relative_path_abi_stable: true
+- runner_absolute_roots_may_vary: true
+- runner_path_segments_may_change_per_run: false
+- runner_abi_shared_by_all_roles: true
+- controller_precreates_runner_dirs_for_all_phases: true
+- worker_verifier_tester_fixer_create_runner_dirs: false
+- capsule_handshake_probe_required_for_dispatch: true
+- controller_log_policy: verifier_owned_logs
+- controller_trust_discipline: true
+- controller_role_boundary: design_dispatch_capsule_final_only
+- integration_contract_default: enabled_for_code_goals
+- dispatch_preview_required: true
+- dispatch_preview_mode: compact_before_first_worker_launch
+- dispatch_preview_fields: objective_output_root_design_phases_assignments_capsules_timeouts_quality_controller_boundary
+- dispatch_preview_auto_run_policy: continue_unless_interrupted_or_ambiguous
+- progress_log_policy: sparse_until_verdict
+- quality_contract_default: enabled_for_code_goals
+- verifier_verdict_file: .agent-work-mux/runs/<goal-id>/<verify-task-id>/verdict.json
+- result_capsule_required: true
+- implementer_capsule_skeleton_required: true
+- implementer_phase_validation_when_verifier_assigned: forbidden
+- implementer_direct_long_running_start_commands: forbidden
+- bounded_self_checks_only: true
+- missing_capsule_status: TIMEOUT_MISSING_CAPSULE
+- max_fix_rounds_default: 1
+- second_fix_round_policy: precise_finding_or_user_approval_only
+- fix_prompt_policy: narrow_scope_only
+- accept_pass_at_threshold: true
+- metrics_summary_file: .agent-work-mux/runs/<goal-id>/metrics/summary.json
+- verifier_capsule_skeleton_required: true
+- verifier_timebox_policy: startup_active_finalization_grace
+- implementer_timebox_default_minutes: 30
+- verifier_timebox_default_minutes: 30
+- verifier_finalization_grace_minutes: 3
+- launch_contract: shell_free_json_cmd_args
+- launch_shell_text_forbidden: true
+- filesystem_creation_policy: launcher_precreates_runner_owned_parent_dirs
+- filesystem_creation_idempotent: true
+- runner_owned_directory_creation_by_worker: forbidden
+- windows_mkdir_p_forbidden: true
+- expected_capsule_precreation_by_controller: forbidden
+- capsule_schema_template_precreation: allowed
+- compact_file_atomic_write_policy: same_directory_temp_then_rename
+- watcher_helper: awm-watch
+- watcher_raw_log_default: false
+- watcher_statuses: CAPSULE_PRESENT,CAPSULE_IN_PROGRESS,RUNNING_ACTIVE,RUNNING_IDLE,ERROR_PRESENT,INVALID_CAPSULE,EXITED_NO_CAPSULE,TIMEOUT_MISSING_CAPSULE,STALE_HEARTBEAT
+- task_id_defaults: implement,verify,fix_codex,verify_final
+- task_id_path_slug_preference: alnum_underscore
+- shared_helper_per_phase_config_split: true
+- windows_cli_shim_resolution: resolve_to_real_executable_before_spawn
+- shell_true_for_cli_wrappers_forbidden: true
+- opencode_prompt_file_policy: prompt_file_plus_message_reference
+- opencode_file_args_after_message: true
+- launch_status_failed: LAUNCH_FAILED
+- launch_status_runtime_no_capsule: RUNTIME_FAILED_NO_CAPSULE
+- launch_heartbeat_required: true
+- duplicate_workspace_path_args_policy: avoid_when_cwd_is_set
+- diagnostic_output_policy: stdout_stderr_warnings_critical_diagnostics
+- warnings_are_verifier_owned: true
+- critical_error_file: .agent-work-mux/runs/<goal-id>/<task-id>/critical-error.json
+- diagnostics_file: .agent-work-mux/runs/<goal-id>/<task-id>/diagnostics.json
+- controller_reads_raw_stderr_by_default: false
+- timeout_anchor: process_started_at_per_attempt
+- startup_timeout_anchor: launcher_started_at
+- stale_timeout_state_policy: ignore_unmatched_attempt_id_or_launch_path
+- launcher_records_task_started_at: true
+- launcher_injects_timing_env: true
+- launch_arg_placeholder_expansion: enabled
+- dependency_artifact_policy: ignore_transient_node_modules_if_gitignored
+- node_dependency_scan_policy: no_recursive_scan
+- deepseek_tier_normalization: enabled
+- recommended_code_policy: deepseek_build_verify_codex_fix
+- codex_fixer_mode: in_session_narrow_patch_only
+- codex_cli_for_fixer_requires_explicit_live_request: true
+- final_accept_source: verifier_verdict
 - agent_registration: natural_language_aliases
 
 ## Model and profile policy
@@ -1791,9 +2249,9 @@ previous goals or invokes `/awm goal list` / `/awm status --all`.
 - Complete: 0
 
 ## Goals
-| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Tokens | Cost | Final report | Record |
-|---------|-----------|-------|---------|---------|-----------|--------------|--------|--------|------|--------------|--------|
-| (none) | | | | | | | | | | | |
+| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Quality score | Worker tokens | Orchestrator tokens | Worker cost | Orchestrator cost | Final report | Record |
+|---------|-----------|-------|---------|---------|-----------|--------------|--------|---------------|---------------|---------------------|-------------|-------------------|--------------|--------|
+| (none) | | | | | | | | | | | | | | |
 
 ---
 Last update: <YYYY-MM-DD HH:MM> by <model-id>

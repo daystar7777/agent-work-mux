@@ -103,9 +103,9 @@ If `AIMemory/goals/INDEX.md` is missing, create:
 - Complete: 0
 
 ## Goals
-| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Tokens | Cost | Final report | Record |
-|---------|-----------|-------|---------|---------|-----------|--------------|--------|--------|------|--------------|--------|
-| (none) | | | | | | | | | | | |
+| Goal-id | Objective | State | Created | Updated | Completed | Orchestrator | Policy | Quality score | Worker tokens | Orchestrator tokens | Worker cost | Orchestrator cost | Final report | Record |
+|---------|-----------|-------|---------|---------|-----------|--------------|--------|---------------|---------------|---------------------|-------------|-------------------|--------------|--------|
+| (none) | | | | | | | | | | | | | | |
 
 ---
 Last update: <YYYY-MM-DD HH:MM> by <model-id>
@@ -244,6 +244,7 @@ by task difficulty and records the choice in the goal record.
 ## Default orchestration policy
 
 - default_policy: single_agent
+- available_policies: single_agent, implement_then_verify, deepseek_build_verify_codex_fix, parallel_review, custom
 - verifier_required: user_selectable
 - headless_requires_explicit_awm: true
 - goal_auto_run_default: true
@@ -251,6 +252,61 @@ by task difficulty and records the choice in the goal record.
 - goal_ledger_file: AIMemory/goals/INDEX.md
 - completion_guard_required: true
 - telemetry_policy: compact_only
+- controller_log_policy: verifier_owned_logs
+- controller_trust_discipline: true
+- controller_role_boundary: design_dispatch_capsule_final_only
+- integration_contract_default: enabled_for_code_goals
+- dispatch_preview_required: true
+- dispatch_preview_mode: compact_before_first_worker_launch
+- dispatch_preview_fields: objective_output_root_design_phases_assignments_capsules_timeouts_quality_controller_boundary
+- dispatch_preview_auto_run_policy: continue_unless_interrupted_or_ambiguous
+- progress_log_policy: sparse_until_verdict
+- quality_contract_default: enabled_for_code_goals
+- verifier_verdict_file: .agent-work-mux/runs/<goal-id>/<verify-task-id>/verdict.json
+- result_capsule_required: true
+- implementer_capsule_skeleton_required: true
+- implementer_phase_validation_when_verifier_assigned: forbidden
+- implementer_direct_long_running_start_commands: forbidden
+- bounded_self_checks_only: true
+- missing_capsule_status: TIMEOUT_MISSING_CAPSULE
+- max_fix_rounds_default: 1
+- second_fix_round_policy: precise_finding_or_user_approval_only
+- fix_prompt_policy: narrow_scope_only
+- accept_pass_at_threshold: true
+- metrics_summary_file: .agent-work-mux/runs/<goal-id>/metrics/summary.json
+- verifier_capsule_skeleton_required: true
+- verifier_timebox_policy: startup_active_finalization_grace
+- implementer_timebox_default_minutes: 30
+- verifier_timebox_default_minutes: 30
+- verifier_finalization_grace_minutes: 3
+- launch_contract: shell_free_json_cmd_args
+- launch_shell_text_forbidden: true
+- windows_cli_shim_resolution: resolve_to_real_executable_before_spawn
+- shell_true_for_cli_wrappers_forbidden: true
+- opencode_prompt_file_policy: prompt_file_plus_message_reference
+- opencode_file_args_after_message: true
+- launch_status_failed: LAUNCH_FAILED
+- launch_status_runtime_no_capsule: RUNTIME_FAILED_NO_CAPSULE
+- launch_heartbeat_required: true
+- duplicate_workspace_path_args_policy: avoid_when_cwd_is_set
+- diagnostic_output_policy: stdout_stderr_warnings_critical_diagnostics
+- warnings_are_verifier_owned: true
+- critical_error_file: .agent-work-mux/runs/<goal-id>/<task-id>/critical-error.json
+- diagnostics_file: .agent-work-mux/runs/<goal-id>/<task-id>/diagnostics.json
+- controller_reads_raw_stderr_by_default: false
+- timeout_anchor: process_started_at_per_attempt
+- startup_timeout_anchor: launcher_started_at
+- stale_timeout_state_policy: ignore_unmatched_attempt_id_or_launch_path
+- launcher_records_task_started_at: true
+- launcher_injects_timing_env: true
+- launch_arg_placeholder_expansion: enabled
+- dependency_artifact_policy: ignore_transient_node_modules_if_gitignored
+- node_dependency_scan_policy: no_recursive_scan
+- deepseek_tier_normalization: enabled
+- recommended_code_policy: deepseek_build_verify_codex_fix
+- codex_fixer_mode: in_session_narrow_patch_only
+- codex_cli_for_fixer_requires_explicit_live_request: true
+- final_accept_source: verifier_verdict
 - agent_call_probe: lazy
 
 ## Model and profile policy
